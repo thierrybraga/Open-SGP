@@ -46,5 +46,5 @@ psutil==5.9.8              # Health checks e monitoramento
 pyotp==2.9.0               # 2FA (TOTP)
 qrcode[pil]==7.4.2         # QR Code para 2FA
 python-jose[cryptography]==3.3.0  # JWT com suporte criptográfico
-gunicorn==21.2.0           # Production WSGI server
+gunicorn==23.0.0           # Production WSGI server
 pyzabbix==1.3.0            # Zabbix API integration
