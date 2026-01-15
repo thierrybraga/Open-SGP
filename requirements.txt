@@ -42,7 +42,7 @@ routeros-api==0.17.0
 paramiko==3.4.0
 
 # Novas dependências - GAPS Fixes
-psutil==5.9.8              # Health checks e monitoramento
+psutil==7.2.1              # Health checks e monitoramento
 pyotp==2.9.0               # 2FA (TOTP)
 qrcode[pil]==7.4.2         # QR Code para 2FA
 python-jose[cryptography]==3.3.0  # JWT com suporte criptográfico
