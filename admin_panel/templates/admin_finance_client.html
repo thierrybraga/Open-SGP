@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Financeiro (Cliente)</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 20px; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { border: 1px solid #ddd; padding: 8px; }
+      th { background: #f2f2f2; }
+      .filters { margin-bottom: 16px; }
+      .totals { margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>Financeiro (Cliente)</h1>
+    <form method="get" class="filters">
+      <label>Cliente ID</label>
+      <input type="text" name="client_id" value="{{ client_id }}" />
+      <label>Status</label>
+      <select name="status">
+        <option value="" {% if not status_ %}selected{% endif %}>Todos</option>
+        <option value="open" {% if status_=='open' %}selected{% endif %}>Em aberto</option>
+        <option value="paid" {% if status_=='paid' %}selected{% endif %}>Pago</option>
+        <option value="overdue" {% if status_=='overdue' %}selected{% endif %}>Vencido</option>
+        <option value="canceled" {% if status_=='canceled' %}selected{% endif %}>Cancelado</option>
+      </select>
+      <label>Vencimento de</label>
+      <input type="date" name="due_from" value="{{ due_from }}" />
+      <label>até</label>
+      <input type="date" name="due_to" value="{{ due_to }}" />
+      <button type="submit">Filtrar</button>
+    </form>
+
+    <div class="totals">
+      <strong>Totais:</strong>
+      Em aberto: R$ {{ '%.2f'|format(totals['open']) }} |
+      Pago: R$ {{ '%.2f'|format(totals['paid']) }} |
+      Vencido: R$ {{ '%.2f'|format(totals['overdue']) }}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Contrato</th>
+          <th>Documento</th>
+          <th>Nosso Número</th>
+          <th>Vencimento</th>
+          <th>Valor</th>
+          <th>Status</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in items %}
+        <tr>
+          <td>{{ t.id }}</td>
+          <td>{{ t.contract_id }}</td>
+          <td>{{ t.document_number }}</td>
+          <td>{{ t.our_number }}</td>
+          <td>{{ t.due_date }}</td>
+          <td>R$ {{ '%.2f'|format(t.amount) }}</td>
+          <td>{{ t.status }}</td>
+          <td>
+            <a href="/admin/finance/title?title_id={{ t.id }}">Detalhes</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <p><a href="/">Voltar</a></p>
+  </body>
+</html>

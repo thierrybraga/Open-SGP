@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}Relatório Financeiro - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+{% endblock %}
+
+{% block content %}
+<div class="container animate__animated animate__fadeInUp">
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item"><a href="/">Home</a></span>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item">Relatórios</span>
+    <span class="breadcrumb-separator">/</span>
+    <span class="breadcrumb-item">Financeiro</span>
+  </nav>
+
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Relatório Financeiro</h1>
+      <p class="page-subtitle">Visão geral de faturamento e inadimplência</p>
+    </div>
+  </header>
+
+  <div class="stats-grid-4">
+    <div class="stat-card">
+      <div class="stat-card-icon success"><span aria-hidden="true">💰</span></div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Receita Estimada (Mês)</div>
+        <div class="stat-card-value">R$ {{ "%.2f"|format(data.revenue_estimated|default(0)) }}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-icon danger"><span aria-hidden="true">⚠️</span></div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Total em Atraso</div>
+        <div class="stat-card-value">R$ {{ "%.2f"|format(data.amount_overdue|default(0)) }}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-icon warning"><span aria-hidden="true">📄</span></div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Títulos em Aberto</div>
+        <div class="stat-card-value">{{ data.titles_open|default(0) }}</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-icon primary"><span aria-hidden="true">📉</span></div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Inadimplência (%)</div>
+        <div class="stat-card-value">{{ "%.1f"|format(data.delinquency_rate|default(0)) }}%</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Detalhamento por Status</h2>
+    </div>
+    <div class="card-body">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Quantidade</th>
+            <th>Valor Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in data.by_status %}
+          <tr>
+            <td>
+              <span class="status-indicator {{ 'success' if item.status == 'paid' else 'danger' if item.status == 'overdue' else 'warning' }}">
+                {{ item.status }}
+              </span>
+            </td>
+            <td>{{ item.count }}</td>
+            <td>R$ {{ "%.2f"|format(item.amount) }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3">Nenhum dado disponível</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

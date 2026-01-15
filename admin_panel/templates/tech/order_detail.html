@@ -1,0 +1,36 @@
+{% extends "tech/base.html" %}
+{% block content %}
+<a href="/tech/dashboard" class="btn btn-secondary btn-sm" style="margin-bottom: 1rem;">&larr; Voltar</a>
+
+<div class="os-card" style="cursor: default;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0;">OS #{{ order.id }}</h2>
+        <span class="os-status status-{{ order.status }}">{{ order.status }}</span>
+    </div>
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 1rem 0;">
+    
+    <h4 style="margin-bottom: 0.5rem; color: #2c3e50;">Cliente</h4>
+    <p style="margin-bottom: 1.5rem;">
+        <strong>{{ order.contract.client.name }}</strong><br>
+        <a href="tel:{{ order.contract.client.phone }}" style="color: var(--primary-color); text-decoration: none;">📞 {{ order.contract.client.phone }}</a>
+    </p>
+    
+    <h4 style="margin-bottom: 0.5rem; color: #2c3e50;">Endereço</h4>
+    <p style="margin-bottom: 0.5rem;">{{ order.contract.address }}</p>
+    <a href="https://maps.google.com/?q={{ order.contract.address }}" target="_blank" class="btn btn-outline-primary btn-sm" style="display: inline-block; margin-bottom: 1.5rem;">📍 Abrir no Mapa</a>
+    
+    <h4 style="margin-bottom: 0.5rem; color: #2c3e50;">Descrição</h4>
+    <p style="background: #f8f9fa; padding: 0.8rem; border-radius: 4px; font-size: 0.95rem;">{{ order.description }}</p>
+</div>
+
+{% if order.status == 'assigned' or order.status == 'open' %}
+<form action="/tech/order/{{ order.id }}/start" method="POST">
+    <button type="submit" class="btn btn-primary btn-large">🚀 Iniciar Atendimento</button>
+</form>
+{% elif order.status == 'in_progress' %}
+<form action="/tech/order/{{ order.id }}/finish" method="POST">
+    <textarea name="notes" class="form-control" placeholder="Observações de finalização (obrigatório)..." rows="4" required style="margin-bottom: 1rem; width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 4px;"></textarea>
+    <button type="submit" class="btn btn-success btn-large">✅ Finalizar OS</button>
+</form>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,101 @@
+services:
+  api:
+    build: .
+    container_name: isp_erp_api
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/isp_erp
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=change-me
+      - ACCESS_TOKEN_EXPIRE_MINUTES=60
+      - CORS_ALLOW_ORIGINS=*
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - db
+      - redis
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  admin:
+    build: .
+    container_name: isp_erp_admin
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/isp_erp
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=change-me
+    command: ["python", "-m", "flask", "--app", "admin_panel.app", "run", "--host", "0.0.0.0", "--port", "5000"]
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    depends_on:
+      - api
+      - db
+      - redis
+
+  db:
+    image: postgres:16
+    container_name: isp_erp_db
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=isp_erp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./scripts/init-zabbix-db.sh:/docker-entrypoint-initdb.d/init-zabbix-db.sh
+
+  redis:
+    image: redis:7
+    container_name: isp_erp_redis
+    ports:
+      - "6379:6379"
+
+  worker_comm:
+    build: .
+    container_name: isp_erp_worker_comm
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://postgres:postgres@db:5432/isp_erp
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - .:/app
+    command: ["python", "-m", "app.workers.communication_worker"]
+
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:ubuntu-latest
+    container_name: isp_erp_zabbix_server
+    ports:
+      - "10051:10051"
+    environment:
+      - DB_SERVER_HOST=db
+      - DB_SERVER_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=zabbix
+    depends_on:
+      - db
+    restart: always
+
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:ubuntu-latest
+    container_name: isp_erp_zabbix_web
+    ports:
+      - "8081:8080"
+    environment:
+      - DB_SERVER_HOST=db
+      - DB_SERVER_PORT=5432
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=zabbix
+      - ZBX_SERVER_HOST=zabbix-server
+      - PHP_TZ=America/Sao_Paulo
+    depends_on:
+      - db
+      - zabbix-server
+    restart: always
+
+volumes:
+  pgdata:

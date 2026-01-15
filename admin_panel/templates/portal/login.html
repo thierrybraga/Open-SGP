@@ -1,0 +1,25 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Login - Portal do Cliente{% endblock %}
+
+{% block content %}
+<div class="portal-container">
+    <div class="portal-card">
+        <h2 class="portal-title">Área do Cliente</h2>
+        <form action="/portal/login" method="POST">
+            <div class="form-group">
+                <label for="email">Email ou CPF/CNPJ</label>
+                <input type="text" id="email" name="email" class="form-control" required placeholder="Digite seu email ou documento">
+            </div>
+            <div class="form-group">
+                <label for="password">Senha</label>
+                <input type="password" id="password" name="password" class="form-control" required placeholder="Sua senha">
+            </div>
+            <button type="submit" class="btn btn-primary portal-btn-full">Entrar</button>
+        </form>
+        <div class="portal-link-center">
+            <a href="#" class="small">Esqueci minha senha</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

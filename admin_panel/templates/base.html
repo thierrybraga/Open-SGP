@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}ISP ERP{% endblock %}</title>
+    
+    <!-- Fonts & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- UI Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+    
+    <!-- Core CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}">
+    
+    <!-- Custom Styles Block -->
+    {% block styles %}{% endblock %}
+    
+    <style>
+        :root {
+            --font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+        }
+        body {
+            font-family: var(--font-family-base);
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+        .main-wrapper {
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        .content-wrapper {
+            flex: 1;
+            padding-top: var(--header-height, 60px);
+        }
+        /* Page Transitions */
+        .fade-in {
+            animation: fadeIn 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="main-wrapper {% block body_class %}{% endblock %}">
+    <!-- Navbar -->
+    {% block navbar %}
+    {% include 'components/navbar.html' %}
+    {% endblock %}
+
+    <!-- Main Content -->
+    <main class="content-wrapper main-content" id="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    {% block footer %}
+    {% include 'components/footer.html' %}
+    {% endblock %}
+
+    <!-- Core JS -->
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+    
+    <script>
+        const UI = {
+            toast: {
+                success: (msg) => {
+                    Toastify({
+                        text: msg,
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "var(--success-color, #2ecc71)" },
+                        stopOnFocus: true
+                    }).showToast();
+                },
+                error: (msg) => {
+                    Toastify({
+                        text: msg,
+                        duration: 4000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "var(--danger-color, #e74c3c)" },
+                        stopOnFocus: true
+                    }).showToast();
+                },
+                info: (msg) => {
+                    Toastify({
+                        text: msg,
+                        duration: 3000,
+                        gravity: "top",
+                        position: "right",
+                        style: { background: "var(--primary-color, #3498db)" },
+                        stopOnFocus: true
+                    }).showToast();
+                }
+            }
+        };
+    </script>
+
+    <!-- Page Specific Scripts -->
+    {% block scripts %}{% endblock %}
+</body>
+</html>

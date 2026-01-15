@@ -1,0 +1,87 @@
+<!--
+Arquivo: admin_panel/templates/profile.html
+
+Responsabilidade:
+Página de perfil do usuário.
+
+Integrações:
+- admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Perfil - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+</head>
+<body>
+  <div class="main-wrapper">
+    <!-- Navbar -->
+    {% include 'components/navbar.html' %}
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <div class="container">
+        <!-- Breadcrumbs -->
+        <nav aria-label="Breadcrumb" class="breadcrumb">
+          <span class="breadcrumb-item">
+            <a href="/">Home</a>
+          </span>
+          <span class="breadcrumb-separator" aria-hidden="true">/</span>
+          <span class="breadcrumb-item">Meu Perfil</span>
+        </nav>
+
+        <header class="page-header">
+          <h1 class="page-title">Meu Perfil</h1>
+          <p class="page-subtitle">Visualize suas informações pessoais</p>
+        </header>
+
+        <div class="card">
+          <div class="card-body">
+            <div class="profile-header" style="display: flex; align-items: center; gap: 1rem; margin-bottom: 2rem;">
+              <div class="profile-avatar" style="width: 80px; height: 80px; background-color: #e2e8f0; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">
+                👤
+              </div>
+              <div>
+                <h2 style="margin: 0;">{{ user }}</h2>
+                <span class="badge badge-primary">Administrador</span>
+              </div>
+            </div>
+
+            <div class="profile-details">
+              <dl style="display: grid; grid-template-columns: 150px 1fr; gap: 1rem;">
+                <dt style="font-weight: 600;">Usuário:</dt>
+                <dd>{{ user }}</dd>
+
+                <dt style="font-weight: 600;">Função:</dt>
+                <dd>Administrador do Sistema</dd>
+
+                <dt style="font-weight: 600;">Status:</dt>
+                <dd><span class="status-indicator success"><span class="status-dot"></span>Ativo</span></dd>
+
+                <dt style="font-weight: 600;">Último Acesso:</dt>
+                <dd>Hoje</dd>
+              </dl>
+            </div>
+            
+            <div style="margin-top: 2rem;">
+              <a href="/settings" class="btn btn-outline-primary">Editar Configurações</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+
+    <!-- Footer -->
+    {% include 'components/footer.html' %}
+  </div>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+</body>
+</html>

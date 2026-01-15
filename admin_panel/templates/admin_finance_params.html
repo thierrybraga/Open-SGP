@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Parâmetros Financeiros - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item"><a href="/admin/finance">Financeiro</a></span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">Parâmetros</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Parâmetros Financeiros</h1>
+          <p class="page-subtitle">Configure os parâmetros de cobrança por empresa</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-primary" data-modal-target="modal-param">
+            <span aria-hidden="true">➕</span>
+            Novo Parâmetro
+          </button>
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+
+      <div id="pagination-container"></div>
+    </div>
+  </main>
+
+  <div id="modal-param" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Novo Parâmetro</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-param" method="post" data-validate>
+          <input type="hidden" name="id" id="param-id" />
+
+          <div class="form-group">
+            <label for="company_id" class="form-label required">Empresa</label>
+            <select id="company_id" name="company_id" class="form-select" required>
+              <option value="">Selecione...</option>
+              {% for c in companies %}
+              <option value="{{ c.id }}">{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="default_carrier_id" class="form-label required">Portador Padrão</label>
+            <select id="default_carrier_id" name="default_carrier_id" class="form-select" required>
+              <option value="">Selecione...</option>
+              {% for ca in carriers %}
+              <option value="{{ ca.id }}">{{ ca.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="fine_percent" class="form-label">Multa (%)</label>
+              <input type="number" id="fine_percent" name="fine_percent" class="form-control" step="0.01" value="2.00" />
+            </div>
+
+            <div class="form-group">
+              <label for="interest_percent" class="form-label">Juros (%)</label>
+              <input type="number" id="interest_percent" name="interest_percent" class="form-control" step="0.01" value="1.00" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">
+              <input type="checkbox" id="send_email_on_issue" name="send_email_on_issue" />
+              Enviar e-mail na emissão do título
+            </label>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" form="form-param" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  {% include 'components/footer.html' %}
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    const sampleData = {{ items|tojson|safe if items else '[]' }};
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'ID', sortable: true },
+          {
+            field: 'company',
+            label: 'Empresa',
+            sortable: true,
+            render: (val) => val ? val.name : '-'
+          },
+          {
+            field: 'carrier',
+            label: 'Portador',
+            sortable: true,
+            render: (val) => val ? val.name : '-'
+          },
+          { field: 'fine_percent', label: 'Multa (%)', sortable: true },
+          { field: 'interest_percent', label: 'Juros (%)', sortable: true },
+          {
+            field: 'send_email_on_issue',
+            label: 'Enviar E-mail',
+            sortable: true,
+            render: (val) => val ? 'Sim' : 'Não'
+          }
+        ],
+        data: sampleData,
+        actions: [
+          {
+            name: 'edit',
+            label: 'Editar',
+            icon: '✏️',
+            handler: function(row) {
+              editParam(row);
+            }
+          },
+          {
+            name: 'delete',
+            label: 'Excluir',
+            icon: '🗑️',
+            variant: 'danger',
+            handler: function(row) {
+              deleteParam(row);
+            }
+          }
+        ],
+        emptyMessage: 'Nenhum parâmetro configurado'
+      });
+
+      const pagination = new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: sampleData.length,
+        currentPage: 1,
+        pageSize: 10
+      });
+
+      const formValidator = new ISP_Components.FormValidator('#form-param', {
+        company_id: { required: true, messages: { required: 'Selecione uma empresa' }},
+        default_carrier_id: { required: true, messages: { required: 'Selecione um portador' }}
+      });
+
+      document.getElementById('form-param').addEventListener('submit', function(e) {
+        e.preventDefault();
+        if (!formValidator.validate()) return;
+
+        const formData = new FormData(this);
+        fetch(window.location.pathname, {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+          ISP_ERP.closeModal('modal-param');
+          ISP_AdvancedComponents.Toast.success('Parâmetro salvo com sucesso!');
+          location.reload();
+        })
+        .catch(error => {
+          ISP_AdvancedComponents.Toast.error('Erro ao salvar parâmetro');
+        });
+      });
+
+      window.editParam = function(row) {
+        document.getElementById('param-id').value = row.id;
+        document.getElementById('company_id').value = row.company ? row.company.id : '';
+        document.getElementById('default_carrier_id').value = row.carrier ? row.carrier.id : '';
+        document.getElementById('fine_percent').value = row.fine_percent;
+        document.getElementById('interest_percent').value = row.interest_percent;
+        document.getElementById('send_email_on_issue').checked = row.send_email_on_issue;
+
+        document.getElementById('modal-title').textContent = 'Editar Parâmetro';
+        ISP_ERP.openModal('modal-param');
+      };
+
+      window.deleteParam = function(row) {
+        ISP_ERP.confirm(`Tem certeza que deseja excluir este parâmetro?`, function(confirmed) {
+          if (confirmed) {
+            ISP_AdvancedComponents.Toast.success('Parâmetro excluído com sucesso!');
+            location.reload();
+          }
+        });
+      };
+
+      document.querySelectorAll('[data-modal-close]').forEach(btn => {
+        btn.addEventListener('click', function() {
+          document.getElementById('form-param').reset();
+          formValidator.reset();
+          document.getElementById('modal-title').textContent = 'Novo Parâmetro';
+        });
+      });
+    });
+  </script>
+</body>
+</html>

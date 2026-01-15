@@ -1,0 +1,315 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - ISP ERP{% endblock %}
+
+{% block styles %}
+<style>
+    /* Dashboard Grid */
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    /* Dashboard Cards */
+    .dashboard-card {
+        background: var(--bg-card);
+        border-radius: 1rem;
+        padding: 1.5rem;
+        box-shadow: var(--shadow-sm);
+        transition: transform 0.2s, box-shadow 0.2s;
+        border: 1px solid var(--border-light);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    
+    .dashboard-card:hover {
+        transform: translateY(-5px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .dashboard-card-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .dashboard-card-icon.primary { background: rgba(52, 152, 219, 0.1); color: var(--primary-color); }
+    .dashboard-card-icon.success { background: rgba(46, 204, 113, 0.1); color: var(--success-color); }
+    .dashboard-card-icon.warning { background: rgba(241, 196, 15, 0.1); color: var(--warning-color); }
+    .dashboard-card-icon.danger { background: rgba(231, 76, 60, 0.1); color: var(--danger-color); }
+
+    .dashboard-card-title {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .dashboard-card-value {
+        font-size: 1.75rem;
+        font-weight: 700;
+        color: var(--text-primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .dashboard-card-subtitle {
+        font-size: 0.75rem;
+        color: var(--text-secondary);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    /* Charts & Tables Containers */
+    .grid-2 {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .card {
+        background: var(--bg-card);
+        border-radius: 1rem;
+        box-shadow: var(--shadow-sm);
+        border: 1px solid var(--border-light);
+        overflow: hidden;
+    }
+
+    .card-header {
+        padding: 1.25rem 1.5rem;
+        border-bottom: 1px solid var(--border-light);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .card-title {
+        font-size: 1rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+    }
+
+    .card-body {
+        padding: 1.5rem;
+    }
+
+    .stats-grid-4 {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1rem;
+        text-align: center;
+    }
+    
+    .stat-value-lg {
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-top: 0.5rem;
+    }
+
+    /* Utilities */
+    .text-success { color: var(--success-color); }
+    .text-warning { color: var(--warning-color); }
+    .text-danger { color: var(--danger-color); }
+    
+    @media (max-width: 768px) {
+        .grid-2, .stats-grid-4 { grid-template-columns: 1fr; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container fade-in">
+    <!-- Header -->
+    <header class="page-header d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="page-title animate__animated animate__fadeInLeft">Dashboard</h1>
+            <p class="page-subtitle text-muted animate__animated animate__fadeInLeft animate__delay-1s">Visão geral do sistema</p>
+        </div>
+        <div class="actions animate__animated animate__fadeInRight">
+            <button class="btn btn-outline-primary" onclick="window.location.reload()">
+                <i class="fas fa-sync-alt"></i> Atualizar
+            </button>
+            <button class="btn btn-primary" onclick="UI.toast.info('Exportando relatório...')">
+                <i class="fas fa-download"></i> Exportar
+            </button>
+        </div>
+    </header>
+
+    <!-- KPI Cards -->
+    <div class="dashboard-grid">
+        <!-- Clients -->
+        <div class="dashboard-card animate__animated animate__fadeInUp">
+            <div class="dashboard-card-icon primary">
+                <i class="fas fa-users"></i>
+            </div>
+            <div class="dashboard-card-title">Clientes</div>
+            <div class="dashboard-card-value">{{ overview.clients_total }}</div>
+            <div class="dashboard-card-subtitle">
+                <i class="fas fa-circle text-success" style="font-size: 8px;"></i>
+                {{ overview.clients_active }} ativos
+            </div>
+        </div>
+
+        <!-- Contracts -->
+        <div class="dashboard-card animate__animated animate__fadeInUp" style="animation-delay: 0.1s;">
+            <div class="dashboard-card-icon success">
+                <i class="fas fa-file-contract"></i>
+            </div>
+            <div class="dashboard-card-title">Contratos</div>
+            <div class="dashboard-card-value">{{ overview.contracts_active }}</div>
+            <div class="dashboard-card-subtitle">
+                <i class="fas fa-circle text-danger" style="font-size: 8px;"></i>
+                {{ overview.blocked_contracts }} bloqueados
+            </div>
+        </div>
+
+        <!-- Finance -->
+        <div class="dashboard-card animate__animated animate__fadeInUp" style="animation-delay: 0.2s;">
+            <div class="dashboard-card-icon warning">
+                <i class="fas fa-hand-holding-usd"></i>
+            </div>
+            <div class="dashboard-card-title">Em Atraso</div>
+            <div class="dashboard-card-value">R$ {{ '%.2f'|format(overview.amount_overdue) }}</div>
+            <div class="dashboard-card-subtitle">
+                {{ overview.titles_overdue }} títulos vencidos
+            </div>
+        </div>
+
+        <!-- Service Orders -->
+        <div class="dashboard-card animate__animated animate__fadeInUp" style="animation-delay: 0.3s;">
+            <div class="dashboard-card-icon primary">
+                <i class="fas fa-tools"></i>
+            </div>
+            <div class="dashboard-card-title">OS em Progresso</div>
+            <div class="dashboard-card-value">{{ overview.service_orders_in_progress }}</div>
+            <div class="dashboard-card-subtitle">
+                Sucesso Comms: {{ '%.1f'|format(overview.communication_success_rate) }}%
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="grid-2">
+        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.4s;">
+            <div class="card-header">
+                <h3 class="card-title">Taxa de Sucesso de Comunicação (7 dias)</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="commChart"></canvas>
+            </div>
+        </div>
+
+        <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.5s;">
+            <div class="card-header">
+                <h3 class="card-title">Ocorrências por Categoria</h3>
+            </div>
+            <div class="card-body">
+                <canvas id="occChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Tables Section -->
+     <div class="card animate__animated animate__fadeIn" style="animation-delay: 0.6s;">
+        <div class="card-header">
+            <h3 class="card-title">Estatísticas por Provedor</h3>
+        </div>
+        <div class="card-body">
+             <div id="provider-table-container"></div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Init Charts
+        const ctxComm = document.getElementById('commChart').getContext('2d');
+        new Chart(ctxComm, {
+            type: 'line',
+            data: {
+                labels: [{% for p in comm %}'{{ p.date }}',{% endfor %}],
+                datasets: [{
+                    label: 'Sucesso (%)',
+                    data: [{% for p in comm %}{{ p.success_rate }},{% endfor %}],
+                    borderColor: '#3498db',
+                    tension: 0.4,
+                    fill: true,
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)'
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+
+        const ctxOcc = document.getElementById('occChart').getContext('2d');
+        new Chart(ctxOcc, {
+            type: 'bar',
+            data: {
+                labels: [{% for b in occ_cat_bars %}'{{ b.label }}',{% endfor %}],
+                datasets: [{
+                    label: 'Ocorrências',
+                    data: [{% for b in occ_cat_bars %}{{ b.count }},{% endfor %}],
+                    backgroundColor: ['#2ecc71', '#e74c3c', '#f1c40f', '#9b59b6', '#34495e'],
+                    borderRadius: 4
+                }]
+            },
+            options: { responsive: true, plugins: { legend: { display: false } } }
+        });
+        
+        // Re-init Legacy Table (Compatibility Wrapper)
+        const providerData = [
+            {% for s in providers_stats %}
+            {
+              provider: '{{ s.provider }}',
+              total: {{ s.total }},
+              sent: {{ s.sent }},
+              success_rate: {{ s.success_rate }}
+            }{% if not loop.last %},{% endif %}
+            {% endfor %}
+        ];
+        
+        // Simple Table Render for now (replacing the complex JS component to ensure it works immediately)
+        const tableContainer = document.getElementById('provider-table-container');
+        let tableHtml = `
+        <table class="data-table" style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr style="background: var(--bg-secondary); text-align: left;">
+                    <th style="padding: 1rem;">Provedor</th>
+                    <th style="padding: 1rem;">Total</th>
+                    <th style="padding: 1rem;">Enviadas</th>
+                    <th style="padding: 1rem;">Sucesso</th>
+                </tr>
+            </thead>
+            <tbody>
+        `;
+        
+        providerData.forEach(row => {
+            const color = row.success_rate >= 90 ? 'var(--success-color)' : 'var(--danger-color)';
+            tableHtml += `
+                <tr style="border-bottom: 1px solid var(--border-light);">
+                    <td style="padding: 1rem;">${row.provider}</td>
+                    <td style="padding: 1rem;">${row.total}</td>
+                    <td style="padding: 1rem;">${row.sent}</td>
+                    <td style="padding: 1rem;">
+                        <span style="color: ${color}; font-weight: bold;">${row.success_rate.toFixed(1)}%</span>
+                    </td>
+                </tr>
+            `;
+        });
+        tableHtml += '</tbody></table>';
+        tableContainer.innerHTML = tableHtml;
+    });
+</script>
+{% endblock %}

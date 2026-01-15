@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Financeiro do Cliente - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <!-- Skip Link -->
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+  <!-- Navigation -->
+  {% include 'components/navbar.html' %}
+
+  <!-- Main Content -->
+  <main id="main-content" class="main-content">
+    <div class="container">
+
+      <!-- Breadcrumbs -->
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item">
+          <a href="/">Home</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">
+          <a href="/admin/finance">Financeiro</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">Cliente</span>
+      </nav>
+
+      <!-- Page Header -->
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Financeiro do Cliente</h1>
+          <p class="page-subtitle">Visualize e gerencie títulos financeiros por cliente</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-outline-primary" onclick="exportData()">
+            <span aria-hidden="true">📥</span>
+            Exportar
+          </button>
+          <button type="button" class="btn btn-primary" data-modal-target="modal-new-title">
+            <span aria-hidden="true">➕</span>
+            Novo Título
+          </button>
+        </div>
+      </header>
+
+      <!-- Summary Cards -->
+      <div class="dashboard-grid">
+        <div class="dashboard-card">
+          <div class="dashboard-card-icon primary">
+            <span aria-hidden="true">📄</span>
+          </div>
+          <div class="dashboard-card-title">Em Aberto</div>
+          <div class="dashboard-card-value">R$ {{ '%.2f'|format(totals['open']) }}</div>
+          <div class="dashboard-card-subtitle">
+            <span class="dashboard-card-trend up" aria-label="Aumento">↑ 5.2%</span>
+            vs. mês anterior
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="dashboard-card-icon success">
+            <span aria-hidden="true">✓</span>
+          </div>
+          <div class="dashboard-card-title">Pago</div>
+          <div class="dashboard-card-value">R$ {{ '%.2f'|format(totals['paid']) }}</div>
+          <div class="dashboard-card-subtitle">
+            <span class="dashboard-card-trend up" aria-label="Aumento">↑ 12.8%</span>
+            vs. mês anterior
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="dashboard-card-icon danger">
+            <span aria-hidden="true">⚠</span>
+          </div>
+          <div class="dashboard-card-title">Vencido</div>
+          <div class="dashboard-card-value">R$ {{ '%.2f'|format(totals['overdue']) }}</div>
+          <div class="dashboard-card-subtitle">
+            <span class="dashboard-card-trend down" aria-label="Redução">↓ 3.1%</span>
+            vs. mês anterior
+          </div>
+        </div>
+
+        <div class="dashboard-card">
+          <div class="dashboard-card-icon warning">
+            <span aria-hidden="true">📊</span>
+          </div>
+          <div class="dashboard-card-title">Total</div>
+          <div class="dashboard-card-value">R$ {{ '%.2f'|format(totals['open'] + totals['paid'] + totals['overdue']) }}</div>
+          <div class="dashboard-card-subtitle">
+            Todos os títulos
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div id="filter-container"></div>
+
+      <!-- Data Table -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Títulos Financeiros</h2>
+          <div class="card-actions">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="refreshData()" aria-label="Atualizar dados">
+              <span aria-hidden="true">🔄</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="pagination-container"></div>
+
+    </div>
+  </main>
+
+  <!-- Modal: View Title Details -->
+  <div id="modal-title-details" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 800px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Detalhes do Título</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="tabs-container"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Fechar</button>
+        <button type="button" class="btn btn-primary" onclick="printTitle()">
+          <span aria-hidden="true">🖨️</span>
+          Imprimir Boleto
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  {% include 'components/footer.html' %}
+
+  <!-- JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    // Sample data (replace with actual data from backend)
+    const sampleData = [
+      {
+        id: 1,
+        contract_id: 123,
+        document_number: '001/2024',
+        our_number: '123456',
+        due_date: '2024-12-20',
+        amount: 150.00,
+        status: 'open',
+        client_name: 'João Silva',
+        payment_date: null,
+        discount: 0,
+        interest: 0,
+        fine: 0
+      },
+      {
+        id: 2,
+        contract_id: 124,
+        document_number: '002/2024',
+        our_number: '123457',
+        due_date: '2024-12-15',
+        amount: 200.00,
+        status: 'paid',
+        client_name: 'Maria Santos',
+        payment_date: '2024-12-14',
+        discount: 10.00,
+        interest: 0,
+        fine: 0
+      },
+      {
+        id: 3,
+        contract_id: 125,
+        document_number: '003/2024',
+        our_number: '123458',
+        due_date: '2024-11-30',
+        amount: 180.00,
+        status: 'overdue',
+        client_name: 'Carlos Oliveira',
+        payment_date: null,
+        discount: 0,
+        interest: 5.40,
+        fine: 9.00
+      }
+    ];
+
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // Initialize Filter Panel
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          {
+            name: 'client_id',
+            label: 'Cliente ID',
+            type: 'number',
+            placeholder: 'Digite o ID do cliente'
+          },
+          {
+            name: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'open', label: 'Em Aberto' },
+              { value: 'paid', label: 'Pago' },
+              { value: 'overdue', label: 'Vencido' },
+              { value: 'canceled', label: 'Cancelado' }
+            ]
+          },
+          {
+            name: 'due_date',
+            label: 'Vencimento',
+            type: 'daterange'
+          },
+          {
+            name: 'document_number',
+            label: 'Número do Documento',
+            type: 'text',
+            placeholder: 'Ex: 001/2024'
+          },
+          {
+            name: 'amount',
+            label: 'Valor Mínimo',
+            type: 'number',
+            placeholder: 'Ex: 100.00'
+          }
+        ],
+        onApply: function(filters) {
+          console.log('Filters applied:', filters);
+          // TODO: Apply filters and reload data
+          ISP_AdvancedComponents.Toast.success('Filtros aplicados com sucesso');
+
+          // Simulate filtering
+          const filtered = sampleData.filter(item => {
+            if (filters.status && item.status !== filters.status) return false;
+            if (filters.client_id && item.contract_id != filters.client_id) return false;
+            return true;
+          });
+
+          dataTable.update(filtered);
+        },
+        onReset: function() {
+          console.log('Filters reset');
+          dataTable.update(sampleData);
+          ISP_AdvancedComponents.Toast.info('Filtros limpos');
+        }
+      });
+
+      // Initialize Data Table
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'ID', sortable: true },
+          { field: 'contract_id', label: 'Contrato', sortable: true },
+          { field: 'document_number', label: 'Documento', sortable: true },
+          { field: 'our_number', label: 'Nosso Número', sortable: true },
+          {
+            field: 'due_date',
+            label: 'Vencimento',
+            type: 'date',
+            sortable: true
+          },
+          {
+            field: 'amount',
+            label: 'Valor',
+            type: 'currency',
+            sortable: true
+          },
+          {
+            field: 'status',
+            label: 'Status',
+            type: 'status',
+            sortable: true,
+            render: function(value) {
+              const statusMap = {
+                open: { label: 'Em Aberto', class: 'warning' },
+                paid: { label: 'Pago', class: 'success' },
+                overdue: { label: 'Vencido', class: 'danger' },
+                canceled: { label: 'Cancelado', class: 'secondary' }
+              };
+              const info = statusMap[value] || { label: value, class: 'secondary' };
+              return `
+                <span class="status-indicator ${info.class}">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  ${info.label}
+                </span>
+              `;
+            }
+          }
+        ],
+        data: sampleData,
+        selectable: true,
+        actions: [
+          {
+            name: 'view',
+            label: 'Detalhes',
+            icon: '👁️',
+            handler: function(row) {
+              viewTitleDetails(row);
+            }
+          },
+          {
+            name: 'download',
+            label: 'Boleto',
+            icon: '📄',
+            handler: function(row) {
+              downloadBoleto(row);
+            }
+          },
+          {
+            name: 'pay',
+            label: 'Registrar Pagamento',
+            icon: '💰',
+            handler: function(row) {
+              registerPayment(row);
+            }
+          }
+        ],
+        onSelect: function(selectedIds) {
+          console.log('Selected:', selectedIds);
+          if (selectedIds.length > 0) {
+            ISP_AdvancedComponents.Toast.info(`${selectedIds.length} título(s) selecionado(s)`);
+          }
+        },
+        emptyMessage: 'Nenhum título encontrado'
+      });
+
+      // Initialize Pagination
+      const pagination = new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: sampleData.length,
+        currentPage: 1,
+        pageSize: 10,
+        onPageChange: function(page, pageSize) {
+          console.log('Page changed:', page, pageSize);
+          // TODO: Fetch new data from backend
+          ISP_AdvancedComponents.Toast.info(`Carregando página ${page}...`);
+        }
+      });
+
+      // View title details
+      window.viewTitleDetails = function(row) {
+        // Create tabs with details
+        const tabs = new ISP_AdvancedComponents.Tabs({
+          container: '#tabs-container',
+          variant: 'underline',
+          tabs: [
+            {
+              label: 'Informações Gerais',
+              icon: '📄',
+              content: `
+                <div class="details-grid">
+                  <div class="detail-item">
+                    <label class="detail-label">ID do Título:</label>
+                    <div class="detail-value">${row.id}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Contrato:</label>
+                    <div class="detail-value">${row.contract_id}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Cliente:</label>
+                    <div class="detail-value">${row.client_name || 'N/A'}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Documento:</label>
+                    <div class="detail-value">${row.document_number}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Nosso Número:</label>
+                    <div class="detail-value">${row.our_number}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Status:</label>
+                    <div class="detail-value">
+                      <span class="status-indicator ${row.status === 'paid' ? 'success' : row.status === 'overdue' ? 'danger' : 'warning'}">
+                        ${row.status === 'paid' ? 'Pago' : row.status === 'overdue' ? 'Vencido' : 'Em Aberto'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              `
+            },
+            {
+              label: 'Valores',
+              icon: '💰',
+              content: `
+                <div class="details-grid">
+                  <div class="detail-item">
+                    <label class="detail-label">Valor Original:</label>
+                    <div class="detail-value">${ISP_ERP.formatCurrency(row.amount)}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Desconto:</label>
+                    <div class="detail-value text-success">${ISP_ERP.formatCurrency(row.discount || 0)}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Juros:</label>
+                    <div class="detail-value text-danger">${ISP_ERP.formatCurrency(row.interest || 0)}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Multa:</label>
+                    <div class="detail-value text-danger">${ISP_ERP.formatCurrency(row.fine || 0)}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label"><strong>Valor Final:</strong></label>
+                    <div class="detail-value"><strong>${ISP_ERP.formatCurrency(row.amount - (row.discount || 0) + (row.interest || 0) + (row.fine || 0))}</strong></div>
+                  </div>
+                </div>
+              `
+            },
+            {
+              label: 'Datas',
+              icon: '📅',
+              content: `
+                <div class="details-grid">
+                  <div class="detail-item">
+                    <label class="detail-label">Vencimento:</label>
+                    <div class="detail-value">${ISP_ERP.formatDate(new Date(row.due_date))}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Data de Pagamento:</label>
+                    <div class="detail-value">${row.payment_date ? ISP_ERP.formatDate(new Date(row.payment_date)) : 'Não pago'}</div>
+                  </div>
+                  <div class="detail-item">
+                    <label class="detail-label">Dias ${row.status === 'overdue' ? 'de Atraso' : 'até Vencimento'}:</label>
+                    <div class="detail-value">${calculateDaysDiff(row.due_date)} dias</div>
+                  </div>
+                </div>
+              `
+            },
+            {
+              label: 'Histórico',
+              icon: '📋',
+              content: `
+                <div class="timeline">
+                  <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                      <div class="timeline-time">15/12/2024 10:30</div>
+                      <div class="timeline-text">Título criado</div>
+                    </div>
+                  </div>
+                  <div class="timeline-item">
+                    <div class="timeline-marker"></div>
+                    <div class="timeline-content">
+                      <div class="timeline-time">16/12/2024 14:20</div>
+                      <div class="timeline-text">Boleto enviado por e-mail</div>
+                    </div>
+                  </div>
+                  ${row.payment_date ? `
+                  <div class="timeline-item">
+                    <div class="timeline-marker success"></div>
+                    <div class="timeline-content">
+                      <div class="timeline-time">${ISP_ERP.formatDateTime(new Date(row.payment_date))}</div>
+                      <div class="timeline-text">Pagamento registrado</div>
+                    </div>
+                  </div>
+                  ` : ''}
+                </div>
+              `
+            }
+          ]
+        });
+
+        ISP_ERP.openModal('modal-title-details');
+      };
+
+      // Download boleto
+      window.downloadBoleto = function(row) {
+        ISP_AdvancedComponents.Toast.info('Gerando boleto...', {
+          duration: 2000
+        });
+        setTimeout(() => {
+          ISP_AdvancedComponents.Toast.success('Boleto baixado com sucesso!');
+        }, 2000);
+      };
+
+      // Register payment
+      window.registerPayment = function(row) {
+        ISP_ERP.confirm(
+          `Confirmar pagamento do título ${row.document_number}?`,
+          function(confirmed) {
+            if (confirmed) {
+              ISP_AdvancedComponents.Toast.success('Pagamento registrado com sucesso!');
+              row.status = 'paid';
+              row.payment_date = new Date().toISOString().split('T')[0];
+              dataTable.update(sampleData);
+            }
+          }
+        );
+      };
+
+      // Export data
+      window.exportData = function() {
+        ISP_AdvancedComponents.Toast.info('Exportando dados...', {
+          duration: 2000
+        });
+        setTimeout(() => {
+          ISP_AdvancedComponents.Toast.success('Dados exportados para Excel!');
+        }, 2000);
+      };
+
+      // Refresh data
+      window.refreshData = function() {
+        ISP_AdvancedComponents.Toast.info('Atualizando dados...', {
+          duration: 1500
+        });
+        setTimeout(() => {
+          ISP_AdvancedComponents.Toast.success('Dados atualizados!');
+        }, 1500);
+      };
+
+      // Print title
+      window.printTitle = function() {
+        window.print();
+      };
+
+      // Calculate days difference
+      function calculateDaysDiff(dateStr) {
+        const date = new Date(dateStr);
+        const today = new Date();
+        const diffTime = date - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return Math.abs(diffDays);
+      }
+
+    });
+  </script>
+
+  <style>
+    /* Additional styles for this page */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-lg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-lg);
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-xs);
+    }
+
+    .detail-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .detail-value {
+      font-size: var(--font-size-base);
+      color: var(--text-primary);
+    }
+
+    .text-success {
+      color: var(--success-color);
+    }
+
+    .text-danger {
+      color: var(--danger-color);
+    }
+
+    .timeline {
+      display: flex;
+      flex-direction: column;
+      gap: var(--spacing-md);
+      padding: var(--spacing-md) 0;
+    }
+
+    .timeline-item {
+      display: flex;
+      gap: var(--spacing-md);
+      position: relative;
+    }
+
+    .timeline-item:not(:last-child)::before {
+      content: '';
+      position: absolute;
+      left: 7px;
+      top: 24px;
+      width: 2px;
+      height: calc(100% + var(--spacing-md));
+      background-color: var(--border-color);
+    }
+
+    .timeline-marker {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background-color: var(--primary-color);
+      border: 3px solid var(--bg-primary);
+      box-shadow: 0 0 0 2px var(--primary-color);
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .timeline-marker.success {
+      background-color: var(--success-color);
+      box-shadow: 0 0 0 2px var(--success-color);
+    }
+
+    .timeline-content {
+      flex: 1;
+    }
+
+    .timeline-time {
+      font-size: var(--font-size-xs);
+      color: var(--text-muted);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .timeline-text {
+      font-size: var(--font-size-sm);
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 768px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .page-header-actions {
+        width: 100%;
+      }
+    }
+  </style>
+
+</body>
+</html>

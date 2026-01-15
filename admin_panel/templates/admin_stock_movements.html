@@ -1,0 +1,180 @@
+<!--
+Arquivo: admin_panel/templates/admin_stock_movements.html
+Responsabilidade: Registro de Movimentações de Estoque
+Integrações: admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Movimentações - ISP ERP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Estoque</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Movimentações</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Movimentações</h1>
+          <p class="page-subtitle">Entradas, saídas e transferências</p>
+        </div>
+        <div class="page-header-actions">
+           <button class="btn btn-primary" onclick="openModal('createMovementModal')">Nova Movimentação</button>
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="card-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Tipo</th>
+                <th>Item</th>
+                <th>Almoxarifado</th>
+                <th>Qtd</th>
+                <th>Valor Unit.</th>
+                <th>Obs</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for mov in movements %}
+              <tr>
+                <td>{{ mov.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                <td>
+                  <span class="status-badge {{ 'status-success' if mov.type == 'in' else 'status-danger' }}">
+                    {{ 'Entrada' if mov.type == 'in' else 'Saída' }}
+                  </span>
+                </td>
+                <td>{{ mov.item.name }}</td>
+                <td>{{ mov.warehouse.name }}</td>
+                <td>{{ mov.quantity }}</td>
+                <td>R$ {{ "%.2f"|format(mov.unit_cost or 0) }}</td>
+                <td>{{ mov.note or '-' }}</td>
+              </tr>
+              {% else %}
+              <tr><td colspan="7">Nenhuma movimentação registrada.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal Criar Movimentação -->
+  <div id="createMovementModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Nova Movimentação</h2>
+        <button class="modal-close" aria-label="Fechar modal" data-modal-close>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="createMovementForm" onsubmit="handleCreateMovement(event)">
+          <div class="form-group">
+            <label for="movType" class="form-label required">Tipo</label>
+            <select id="movType" name="type" class="form-control" required>
+              <option value="in">Entrada</option>
+              <option value="out">Saída</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="movWarehouse" class="form-label required">Almoxarifado</label>
+            <select id="movWarehouse" name="warehouse_id" class="form-control" required>
+              {% for wh in warehouses %}
+              <option value="{{ wh.id }}">{{ wh.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="movItem" class="form-label required">Item</label>
+            <select id="movItem" name="item_id" class="form-control" required>
+              {% for item in items %}
+              <option value="{{ item.id }}">{{ item.name }} ({{ item.unit }})</option>
+              {% endfor %}
+            </select>
+          </div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label for="movQty" class="form-label required">Quantidade</label>
+              <input type="number" step="0.01" id="movQty" name="quantity" class="form-control" required>
+            </div>
+            <div class="form-group">
+              <label for="movCost" class="form-label">Custo Unit. (R$)</label>
+              <input type="number" step="0.01" id="movCost" name="unit_cost" class="form-control">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="movNote" class="form-label">Observação</label>
+            <input type="text" id="movNote" name="note" class="form-control">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" form="createMovementForm" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  {% include 'components/footer.html' %}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script>
+    function openModal(id) {
+      ISP_ERP.openModal(id);
+    }
+
+    async function handleCreateMovement(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        type: form.movType.value,
+        warehouse_id: parseInt(form.movWarehouse.value),
+        item_id: parseInt(form.movItem.value),
+        quantity: parseFloat(form.movQty.value),
+        unit_cost: form.movCost.value ? parseFloat(form.movCost.value) : null,
+        note: form.movNote.value
+      };
+      
+      try {
+        const res = await fetch('/admin/stock/movements', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if(json.success) {
+          window.location.reload();
+        } else {
+          alert('Erro: ' + json.error);
+        }
+      } catch(err) {
+        alert('Erro: ' + err);
+      }
+    }
+  </script>
+</body>
+</html>

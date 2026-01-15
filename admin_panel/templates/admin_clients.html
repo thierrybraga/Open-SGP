@@ -1,0 +1,307 @@
+{% extends 'base.html' %}
+
+{% block title %}Clientes - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+{% endblock %}
+
+{% block content %}
+<div class="container">
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item"><a href="/">Home</a></span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item"><a href="/admin">Administração</a></span><span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">Clientes</span>
+  </nav>
+
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Clientes</h1>
+      <p class="page-subtitle">Gerencie os clientes, endereços e contatos</p>
+    </div>
+    <div class="page-header-actions">
+      <button type="button" class="btn btn-primary" onclick="resetClientForm(); ISP_ERP.openModal('modal-client')">
+        <span aria-hidden="true">➕</span>
+        Novo Cliente
+      </button>
+    </div>
+  </header>
+  
+  <div id="filter-container"></div>
+
+  <div class="card animate__animated animate__fadeInUp">
+    <div class="card-body">
+      <div id="table-container"></div>
+    </div>
+  </div>
+  <div id="pagination-container"></div>
+</div>
+
+<div id="modal-client" class="modal-overlay" style="display: none;">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Novo Cliente</h2>
+      <button class="modal-close" aria-label="Fechar modal" onclick="ISP_ERP.closeModal('modal-client')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-client" method="post" action="{{ url_for('admin_clients') }}" data-validate>
+        <input type="hidden" name="id" id="client-id" />
+        
+        <fieldset>
+          <legend>Dados Pessoais</legend>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label for="person_type" class="form-label required">Tipo</label>
+                <select id="person_type" name="person_type" class="form-control" required>
+                  <option value="PF">Pessoa Física</option>
+                  <option value="PJ">Pessoa Jurídica</option>
+                </select>
+              </div>
+            </div>
+            <div class="col-md-8">
+              <div class="form-group">
+                <label for="document" class="form-label required">CPF/CNPJ</label>
+                <input type="text" id="document" name="document" class="form-control" required />
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="name" class="form-label required">Nome Completo / Razão Social</label>
+            <input type="text" id="name" name="name" class="form-control" required />
+          </div>
+          
+          <div class="row">
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="email" class="form-label required">Email</label>
+                <input type="email" id="email" name="email" class="form-control" required />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="phone" class="form-label required">Telefone</label>
+                <input type="text" id="phone" name="phone" class="form-control" required />
+              </div>
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="mt-3">
+          <legend>Endereço Principal</legend>
+          <div class="row">
+            <div class="col-md-4">
+              <div class="form-group">
+                <label for="zipcode" class="form-label required">CEP</label>
+                <input type="text" id="zipcode" name="zipcode" class="form-control" required />
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-group">
+                <label for="city" class="form-label required">Cidade</label>
+                <input type="text" id="city" name="city" class="form-control" required />
+              </div>
+            </div>
+            <div class="col-md-2">
+              <div class="form-group">
+                <label for="state" class="form-label required">UF</label>
+                <input type="text" id="state" name="state" class="form-control" required maxlength="2" />
+              </div>
+            </div>
+          </div>
+          
+          <div class="row">
+            <div class="col-md-9">
+              <div class="form-group">
+                <label for="street" class="form-label required">Logradouro</label>
+                <input type="text" id="street" name="street" class="form-control" required />
+              </div>
+            </div>
+            <div class="col-md-3">
+              <div class="form-group">
+                <label for="number" class="form-label required">Número</label>
+                <input type="text" id="number" name="number" class="form-control" required />
+              </div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="neighborhood" class="form-label required">Bairro</label>
+            <input type="text" id="neighborhood" name="neighborhood" class="form-control" required />
+          </div>
+        </fieldset>
+        
+        <div class="form-group checkbox-group mt-3">
+          <label>
+            <input type="checkbox" id="is_active" name="is_active" checked />
+            Ativo
+          </label>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="ISP_ERP.closeModal('modal-client')">Cancelar</button>
+      <button type="submit" form="form-client" class="btn btn-primary">Salvar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+<script>
+  const clientsData = [
+    {% for item in items %}
+    {
+      id: {{ item.id }},
+      name: '{{ item.name | replace("'", "\\'") }}',
+      document: '{{ item.document | replace("'", "\\'") }}',
+      email: '{{ item.email | replace("'", "\\'") }}',
+      phone: '{{ item.phone | replace("'", "\\'") }}',
+      person_type: '{{ item.person_type }}',
+      is_active: {{ "true" if item.is_active else "false" }},
+      // Address data (assuming first address is primary/available)
+      {% if item.addresses and item.addresses|length > 0 %}
+      zipcode: '{{ item.addresses[0].zipcode }}',
+      city: '{{ item.addresses[0].city | replace("'", "\\'") }}',
+      state: '{{ item.addresses[0].state }}',
+      street: '{{ item.addresses[0].street | replace("'", "\\'") }}',
+      number: '{{ item.addresses[0].number }}',
+      neighborhood: '{{ item.addresses[0].neighborhood | replace("'", "\\'") }}'
+      {% else %}
+      zipcode: '', city: '', state: '', street: '', number: '', neighborhood: ''
+      {% endif %}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  document.addEventListener('DOMContentLoaded', function() {
+    
+    const filterPanel = new ISP_Components.FilterPanel({
+      container: '#filter-container',
+      filters: [
+        { type: 'text', name: 'name', label: 'Nome', placeholder: 'Filtrar por nome' },
+        { type: 'text', name: 'document', label: 'CPF/CNPJ', placeholder: 'Filtrar por documento' },
+        { type: 'text', name: 'email', label: 'Email', placeholder: 'Filtrar por email' }
+      ],
+      onApply: (filters) => {
+        const params = new URLSearchParams(window.location.search);
+        Object.keys(filters).forEach(key => {
+           if(filters[key]) params.set(key, filters[key]);
+           else params.delete(key);
+        });
+        window.location.search = params.toString();
+      },
+      onReset: () => {
+        window.location.href = window.location.pathname;
+      }
+    });
+
+    const dataTable = new ISP_Components.DataTable({
+      container: '#table-container',
+      columns: [
+        { field: 'id', label: 'ID', sortable: true }, 
+        { field: 'name', label: 'Nome', sortable: true }, 
+        { field: 'document', label: 'CPF/CNPJ', sortable: true },
+        { field: 'city', label: 'Cidade', sortable: true },
+        { field: 'email', label: 'Email', sortable: true },
+        { field: 'is_active', label: 'Ativo', render: (val) => val ? '✅' : '❌' }
+      ],
+      data: clientsData,
+      actions: [
+        { name: 'edit', label: 'Editar', icon: '✏️', handler: (row) => editClient(row) },
+        { name: 'delete', label: 'Excluir', icon: '🗑️', variant: 'danger', handler: (row) => deleteClient(row) }
+      ],
+      emptyMessage: 'Nenhum cliente encontrado'
+    });
+    
+    new ISP_Components.Pagination({
+      container: '#pagination-container',
+      total: clientsData.length,
+      currentPage: 1,
+      pageSize: 10
+    });
+    
+    const formValidator = new ISP_Components.FormValidator('#form-client', {});
+    
+    window.editClient = (row) => {
+      document.getElementById('client-id').value = row.id;
+      document.getElementById('name').value = row.name;
+      document.getElementById('document').value = row.document;
+      document.getElementById('email').value = row.email;
+      document.getElementById('phone').value = row.phone;
+      document.getElementById('person_type').value = row.person_type;
+      document.getElementById('is_active').checked = row.is_active;
+      
+      // Address fields
+      document.getElementById('zipcode').value = row.zipcode || '';
+      document.getElementById('city').value = row.city || '';
+      document.getElementById('state').value = row.state || '';
+      document.getElementById('street').value = row.street || '';
+      document.getElementById('number').value = row.number || '';
+      document.getElementById('neighborhood').value = row.neighborhood || '';
+
+      document.getElementById('modal-title').textContent = 'Editar Cliente';
+      ISP_ERP.openModal('modal-client');
+    };
+
+    // Legacy listeners removed
+    /*
+    document.querySelectorAll('[data-modal-target="modal-client"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.getElementById('form-client').reset();
+        document.getElementById('client-id').value = '';
+        document.getElementById('modal-title').textContent = 'Novo Cliente';
+        ISP_ERP.openModal('modal-client');
+      });
+    });
+
+    document.querySelectorAll('[data-modal-close]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ISP_ERP.closeModal('modal-client');
+      });
+    });
+    */
+
+    window.deleteClient = (row) => {
+      ISP_ERP.confirm('Tem certeza que deseja excluir este cliente?', (confirmed) => {
+        if (confirmed) {
+          fetch(`/admin/clients/${row.id}/delete`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                if (window.UI && window.UI.toast) {
+                    UI.toast.success('Cliente excluído com sucesso!');
+                } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.success('Cliente excluído com sucesso!');
+                } else {
+                    alert('Cliente excluído com sucesso!');
+                }
+                setTimeout(() => window.location.reload(), 1000);
+              } else {
+                if (window.UI && window.UI.toast) {
+                    UI.toast.error(data.error || 'Erro ao excluir cliente');
+                } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.error(data.error || 'Erro ao excluir cliente');
+                } else {
+                    alert(data.error || 'Erro ao excluir cliente');
+                }
+              }
+            })
+            .catch(err => {
+              if (window.UI && window.UI.toast) {
+                    UI.toast.error('Erro de conexão');
+              } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.error('Erro de conexão');
+              } else {
+                    alert('Erro de conexão');
+              }
+            });
+        }
+      });
+    };
+  });
+</script>
+{% endblock %}

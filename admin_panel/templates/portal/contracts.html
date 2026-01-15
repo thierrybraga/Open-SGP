@@ -1,0 +1,45 @@
+<!--
+Arquivo: admin_panel/templates/portal/contracts.html
+Responsabilidade: Visualização de Contratos do Cliente
+-->
+{% extends "portal/base.html" %}
+
+{% block title %}Contratos - Portal do Cliente{% endblock %}
+
+{% block content %}
+<div class="portal-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>Meus Contratos</h2>
+        <a href="/portal/dashboard" class="btn btn-sm btn-secondary">Voltar</a>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Contrato #</th>
+                <th>Plano</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Instalado em</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for contract in contracts %}
+            <tr>
+                <td>{{ contract.id }}</td>
+                <td>{{ contract.plan.name if contract.plan else '-' }}</td>
+                <td>R$ {{ "%.2f"|format(contract.amount) }}</td>
+                <td>
+                    <span class="status-badge {{ 'status-success' if contract.status == 'active' else 'status-danger' }}">
+                        {{ contract.status }}
+                    </span>
+                </td>
+                <td>{{ contract.installation_date or '-' }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Nenhum contrato encontrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

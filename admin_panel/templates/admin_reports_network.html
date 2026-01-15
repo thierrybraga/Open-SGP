@@ -1,0 +1,120 @@
+<!--
+Arquivo: admin_panel/templates/admin_reports_network.html
+Responsabilidade: Relatório de Rede (SICI, Status de Contratos)
+Integrações: admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Relatório de Rede - ISP ERP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Relatórios</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Rede</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Relatório de Rede</h1>
+          <p class="page-subtitle">Indicadores de infraestrutura e SICI</p>
+        </div>
+        <div class="page-header-actions">
+           <button class="btn btn-primary" onclick="alert('Exportação SICI XML simulada')">📤 Exportar SICI</button>
+        </div>
+      </header>
+
+      <div class="stats-grid-4">
+        <div class="stat-card">
+          <div class="stat-card-icon success"><span aria-hidden="true">🌐</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Contratos Ativos</div>
+            <div class="stat-card-value">{{ data.contracts_active|default(0) }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon danger"><span aria-hidden="true">🔒</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Bloqueados</div>
+            <div class="stat-card-value">{{ data.contracts_blocked|default(0) }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon primary"><span aria-hidden="true">📡</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Concentradores</div>
+            <div class="stat-card-value">{{ data.nas_count|default(0) }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon warning"><span aria-hidden="true">🔌</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">OLTs Online</div>
+            <div class="stat-card-value">{{ data.olts_online|default(0) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Dados para SICI (Anatel)</h2>
+        </div>
+        <div class="card-body">
+          <table class="data-table">
+             <thead>
+               <tr>
+                 <th>Indicador</th>
+                 <th>Valor</th>
+                 <th>Descrição</th>
+               </tr>
+             </thead>
+             <tbody>
+               <tr>
+                 <td>Acessos Físicos</td>
+                 <td>{{ data.sici_accesses|default(0) }}</td>
+                 <td>Total de acessos ativos em operação</td>
+               </tr>
+               <tr>
+                 <td>Velocidade Média</td>
+                 <td>{{ data.sici_avg_speed|default(0) }} Mbps</td>
+                 <td>Média contratada da base</td>
+               </tr>
+               <tr>
+                 <td>Pessoa Física</td>
+                 <td>{{ data.sici_pf|default(0) }}</td>
+                 <td>Acessos CPF</td>
+               </tr>
+               <tr>
+                 <td>Pessoa Jurídica</td>
+                 <td>{{ data.sici_pj|default(0) }}</td>
+                 <td>Acessos CNPJ</td>
+               </tr>
+             </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  {% include 'components/footer.html' %}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+</body>
+</html>

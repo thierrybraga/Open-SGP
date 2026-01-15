@@ -1,0 +1,358 @@
+<!--
+Arquivo: admin_panel/templates/communication_queue.html
+
+Responsabilidade:
+Lista a fila de mensagens de comunicação com canal, destino, status e horário.
+
+Integrações:
+- admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fila de Comunicação - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <!-- Skip Link -->
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+  <!-- Navigation -->
+  {% include 'components/navbar.html' %}
+
+  <!-- Main Content -->
+  <main id="main-content" class="main-content">
+    <div class="container">
+
+      <!-- Breadcrumbs -->
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item">
+          <a href="/">Home</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">
+          <a href="/communication/queue">Comunicação</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">Fila</span>
+      </nav>
+
+      <!-- Page Header -->
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Fila de Comunicação</h1>
+          <p class="page-subtitle">Gerencie e monitore todas as mensagens em fila do sistema</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-outline-primary" onclick="refreshQueue()">
+            <span aria-hidden="true">🔄</span>
+            Atualizar
+          </button>
+          <button type="button" class="btn btn-primary" onclick="openBulkActionsModal()">
+            <span aria-hidden="true">⚡</span>
+            Ações em Lote
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="window.location.href='/communication/history'">
+            <span aria-hidden="true">📜</span>
+            Histórico
+          </button>
+        </div>
+      </header>
+
+      <!-- Summary Cards -->
+      <div class="stats-grid-4">
+        <div class="stat-card">
+          <div class="stat-card-icon warning">
+            <span aria-hidden="true">⏳</span>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Na Fila</div>
+            <div class="stat-card-value" id="stat-queued">-</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-icon success">
+            <span aria-hidden="true">✓</span>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Enviadas</div>
+            <div class="stat-card-value" id="stat-sent">-</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-icon danger">
+            <span aria-hidden="true">✗</span>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Falhadas</div>
+            <div class="stat-card-value" id="stat-failed">-</div>
+          </div>
+        </div>
+
+        <div class="stat-card">
+          <div class="stat-card-icon primary">
+            <span aria-hidden="true">📊</span>
+          </div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Total</div>
+            <div class="stat-card-value" id="stat-total">-</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div id="filter-container"></div>
+
+      <!-- Data Table -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Mensagens na Fila</h2>
+          <div class="card-actions">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="exportQueue()" aria-label="Exportar dados">
+              <span aria-hidden="true">📥</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="refreshQueue()" aria-label="Atualizar dados">
+              <span aria-hidden="true">🔄</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="pagination-container"></div>
+
+    </div>
+  </main>
+
+  <!-- Modal: Message Details -->
+  <div id="modal-message-details" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 700px;">
+      <div class="modal-header">
+        <h2 class="modal-title">Detalhes da Mensagem</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="message-details-content"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Bulk Actions -->
+  <div id="modal-bulk-actions" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Ações em Lote</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info" role="alert">
+          Selecione mensagens na tabela e escolha uma ação para aplicar a todas.
+        </div>
+
+        <div class="bulk-actions-grid">
+          <button type="button" class="btn btn-primary" onclick="bulkDispatch()">
+            <span aria-hidden="true">🚀</span>
+            Despachar Selecionadas
+          </button>
+          <button type="button" class="btn btn-warning" onclick="bulkRequeue()">
+            <span aria-hidden="true">🔄</span>
+            Reenfileirar Selecionadas
+          </button>
+          <button type="button" class="btn btn-danger" onclick="bulkDelete()">
+            <span aria-hidden="true">🗑️</span>
+            Excluir Selecionadas
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  {% include 'components/footer.html' %}
+
+  <!-- JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    const queueData = [
+      {% for item in items %}
+      {
+        id: {{ item.id }},
+        channel: '{{ item.channel }}',
+        destination: '{{ item.destination }}',
+        content: '{{ item.content | replace("'", "\\'") | replace("\n", " ") | truncate(50) }}',
+        full_content: '{{ item.content | replace("'", "\\'") | replace("\n", "\\n") }}',
+        status: '{{ item.status }}',
+        attempts: {{ item.attempts }},
+        scheduled_at: '{{ item.scheduled_at.strftime("%d/%m/%Y %H:%M") if item.scheduled_at else "Imediato" }}',
+        created_at: '{{ item.created_at.strftime("%d/%m/%Y %H:%M") }}'
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      // Filter Panel
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          { type: 'select', name: 'status', label: 'Status', options: [
+            { value: 'queued', label: 'Na Fila' },
+            { value: 'sent', label: 'Enviada' },
+            { value: 'failed', label: 'Falhou' }
+          ]},
+          { type: 'select', name: 'channel', label: 'Canal', options: [
+            { value: 'sms', label: 'SMS' },
+            { value: 'email', label: 'E-mail' },
+            { value: 'whatsapp', label: 'WhatsApp' }
+          ]}
+        ],
+        onApply: (filters) => {
+           const params = new URLSearchParams(window.location.search);
+           Object.keys(filters).forEach(key => {
+               if(filters[key]) params.set(key, filters[key]);
+               else params.delete(key);
+           });
+           window.location.search = params.toString();
+        }
+      });
+
+      // Update stats
+      document.getElementById('stat-queued').textContent = queueData.filter(i => i.status === 'queued').length;
+      document.getElementById('stat-sent').textContent = queueData.filter(i => i.status === 'sent').length;
+      document.getElementById('stat-failed').textContent = queueData.filter(i => i.status === 'failed').length;
+      document.getElementById('stat-total').textContent = queueData.length;
+
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'ID', sortable: true },
+          { 
+            field: 'channel', 
+            label: 'Canal',
+            render: (val) => {
+               const icons = { 'sms': '📱', 'email': '📧', 'whatsapp': '💬' };
+               return `${icons[val] || ''} ${val}`;
+            }
+          },
+          { field: 'destination', label: 'Destino' },
+          { field: 'content', label: 'Conteúdo' },
+          { 
+            field: 'status', 
+            label: 'Status',
+            render: (val) => {
+              const map = { 'sent': 'success', 'failed': 'error', 'queued': 'warning' };
+              const cls = map[val] || 'secondary';
+              return `<span class="status-indicator ${cls}">${val}</span>`;
+            }
+          },
+          { field: 'attempts', label: 'Tentativas' },
+          { field: 'scheduled_at', label: 'Agendamento' },
+          {
+            field: 'actions',
+            label: 'Ações',
+            render: (val, row) => `
+              <div class="table-actions">
+                <button class="btn-icon" title="Detalhes" onclick="viewMessage(${row.id})">👁️</button>
+                ${row.status === 'failed' || row.status === 'queued' ? 
+                  `<button class="btn-icon" title="Enviar Agora" onclick="dispatchMessage(${row.id})">🚀</button>` : ''}
+                <button class="btn-icon danger" title="Excluir" onclick="deleteMessage(${row.id})">🗑️</button>
+              </div>
+            `
+          }
+        ],
+        data: queueData,
+        pagination: true,
+        itemsPerPage: 10
+      });
+      
+      window.refreshQueue = () => window.location.reload();
+      window.exportQueue = () => alert('Exportação simulada: queue.csv');
+      window.openBulkActionsModal = () => ISP_ERP.openModal('modal-bulk-actions');
+      
+      window.dispatchMessage = (id) => {
+        if(!confirm('Enviar mensagem agora?')) return;
+        fetch(`/communication/queue/${id}/dispatch`, { method: 'POST' })
+          .then(r => r.json())
+          .then(d => {
+            if(d.success) window.location.reload();
+            else alert('Erro: ' + d.error);
+          });
+      };
+
+      window.deleteMessage = (id) => {
+        if(!confirm('Excluir mensagem da fila?')) return;
+        fetch(`/communication/queue/${id}/delete`, { method: 'POST' })
+          .then(r => r.json())
+          .then(d => {
+            if(d.success) window.location.reload();
+            else alert('Erro: ' + d.error);
+          });
+      };
+      
+      window.viewMessage = (id) => {
+        const msg = queueData.find(m => m.id === id);
+        if(!msg) return;
+        
+        const content = `
+          <div class="info-grid">
+            <div class="info-item">
+              <span class="info-label">ID</span>
+              <span class="info-value">${msg.id}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Canal</span>
+              <span class="info-value">${msg.channel}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Destino</span>
+              <span class="info-value">${msg.destination}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Status</span>
+              <span class="info-value">${msg.status}</span>
+            </div>
+            <div class="info-item full-width">
+              <span class="info-label">Conteúdo</span>
+              <div class="info-value" style="white-space: pre-wrap; background: var(--bg-secondary); padding: 0.5rem; border-radius: 4px;">${msg.full_content}</div>
+            </div>
+          </div>
+        `;
+        document.getElementById('message-details-content').innerHTML = content;
+        ISP_ERP.openModal('modal-message-details');
+      };
+
+      // Bulk actions (stubs)
+      window.bulkDispatch = () => alert('Funcionalidade em desenvolvimento');
+      window.bulkRequeue = () => alert('Funcionalidade em desenvolvimento');
+      window.bulkDelete = () => alert('Funcionalidade em desenvolvimento');
+    });
+  </script>
+</body>
+</html>

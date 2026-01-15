@@ -1,0 +1,150 @@
+<!--
+Arquivo: admin_panel/templates/admin_stock_warehouses.html
+Responsabilidade: Gerenciamento de Almoxarifados
+Integrações: admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Almoxarifados - ISP ERP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Estoque</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Almoxarifados</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Almoxarifados</h1>
+          <p class="page-subtitle">Locais de armazenamento</p>
+        </div>
+        <div class="page-header-actions">
+           <button class="btn btn-primary" onclick="openModal('createWarehouseModal')">Novo Almoxarifado</button>
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="card-body">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Código</th>
+                <th>Endereço</th>
+                <th>Status</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for wh in warehouses %}
+              <tr>
+                <td>{{ wh.name }}</td>
+                <td>{{ wh.code }}</td>
+                <td>{{ wh.address or '-' }}</td>
+                <td>
+                  <span class="status-badge {{ 'status-active' if wh.is_active else 'status-inactive' }}">
+                    {{ 'Ativo' if wh.is_active else 'Inativo' }}
+                  </span>
+                </td>
+                <td>
+                   <button class="btn btn-sm btn-icon" onclick="editWarehouse({{ wh.id }})">✏️</button>
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="5">Nenhum almoxarifado cadastrado.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Modal Criar Almoxarifado -->
+  <div id="createWarehouseModal" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Novo Almoxarifado</h2>
+        <button class="modal-close" aria-label="Fechar modal" data-modal-close>✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="createWarehouseForm" onsubmit="handleCreateWarehouse(event)">
+          <div class="form-group">
+            <label for="whName" class="form-label required">Nome</label>
+            <input type="text" id="whName" name="name" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="whCode" class="form-label required">Código</label>
+            <input type="text" id="whCode" name="code" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label for="whAddress" class="form-label">Endereço</label>
+            <input type="text" id="whAddress" name="address" class="form-control">
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" form="createWarehouseForm" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  {% include 'components/footer.html' %}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script>
+    function openModal(id) {
+      ISP_ERP.openModal(id);
+    }
+
+    async function handleCreateWarehouse(e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = {
+        name: form.whName.value,
+        code: form.whCode.value,
+        address: form.whAddress.value
+      };
+      
+      try {
+        const res = await fetch('/admin/stock/warehouses', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(data)
+        });
+        const json = await res.json();
+        if(json.success) {
+          window.location.reload();
+        } else {
+          alert('Erro: ' + json.error);
+        }
+      } catch(err) {
+        alert('Erro: ' + err);
+      }
+    }
+
+    function editWarehouse(id) {
+        alert('TODO: Editar ' + id);
+    }
+  </script>
+</body>
+</html>

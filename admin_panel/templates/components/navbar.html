@@ -1,0 +1,218 @@
+<!-- navbar.html - Componente de navegação modular -->
+<nav class="navbar">
+  <div class="navbar-container">
+    <!-- Brand / Logo -->
+    <a href="/" class="navbar-brand">
+      <div class="navbar-logo">ISP</div>
+      <span>ISP ERP</span>
+    </a>
+
+    <!-- Menu Principal (Desktop & Mobile) -->
+    <ul class="navbar-menu">
+      <li class="navbar-menu-item">
+        <a href="/dashboard" class="navbar-menu-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          Dashboard
+        </a>
+      </li>
+
+      <!-- Dropdown: Rede -->
+      <li class="navbar-menu-item navbar-dropdown">
+        <a href="#" class="navbar-menu-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+            <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+          </svg>
+          Rede
+        </a>
+        <ul class="navbar-dropdown-menu">
+          <li class="navbar-dropdown-item">
+            <a href="/admin/network/devices" class="navbar-dropdown-link">Dispositivos</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/network/vlans" class="navbar-dropdown-link">VLANs</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/network/pools" class="navbar-dropdown-link">Pools de IP</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/network/profiles" class="navbar-dropdown-link">Perfis de Serviço</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/network/assignments" class="navbar-dropdown-link">Atribuições</a>
+          </li>
+          <li class="navbar-dropdown-divider"></li>
+          <li class="navbar-dropdown-item">
+            <a href="/network/blocked" class="navbar-dropdown-link">Contratos Bloqueados</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/network/olt-status" class="navbar-dropdown-link">Status OLT</a>
+          </li>
+        </ul>
+      </li>
+
+      <!-- Dropdown: Financeiro -->
+      <li class="navbar-menu-item navbar-dropdown">
+        <a href="#" class="navbar-menu-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="1" x2="12" y2="23"></line>
+            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+          </svg>
+          Financeiro
+        </a>
+        <ul class="navbar-dropdown-menu">
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/companies" class="navbar-dropdown-link">Empresas</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/carriers" class="navbar-dropdown-link">Portadores</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/receipts" class="navbar-dropdown-link">Pontos de Recebimento</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/parameters" class="navbar-dropdown-link">Parâmetros</a>
+          </li>
+          <li class="navbar-dropdown-divider"></li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/remittance" class="navbar-dropdown-link">Remessa CNAB</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/return" class="navbar-dropdown-link">Retorno CNAB</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/client" class="navbar-dropdown-link">Financeiro do Cliente</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/finance/title" class="navbar-dropdown-link">Títulos</a>
+          </li>
+        </ul>
+      </li>
+
+      <!-- Dropdown: Operações -->
+      <li class="navbar-menu-item navbar-dropdown">
+        <a href="#" class="navbar-menu-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+          Operações
+        </a>
+        <ul class="navbar-dropdown-menu">
+          <li class="navbar-dropdown-item">
+            <a href="/service-orders" class="navbar-dropdown-link">Ordens de Serviço</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/contracts" class="navbar-dropdown-link">Contratos</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/clients" class="navbar-dropdown-link">Clientes</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/plans" class="navbar-dropdown-link">Planos</a>
+          </li>
+          <li class="navbar-dropdown-divider"></li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/support/tickets" class="navbar-dropdown-link">Tickets</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/support/occurrences" class="navbar-dropdown-link">Ocorrências</a>
+          </li>
+        </ul>
+      </li>
+
+      <!-- Dropdown: Admin -->
+      <li class="navbar-menu-item navbar-dropdown">
+        <a href="#" class="navbar-menu-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          Admin
+        </a>
+        <ul class="navbar-dropdown-menu">
+          <li class="navbar-dropdown-item">
+            <a href="/admin/users" class="navbar-dropdown-link">Usuários</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/roles" class="navbar-dropdown-link">Papéis</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/permissions" class="navbar-dropdown-link">Permissões</a>
+          </li>
+          <li class="navbar-dropdown-divider"></li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/communication/queue" class="navbar-dropdown-link">Fila de Mensagens</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/communication/history" class="navbar-dropdown-link">Histórico de Mensagens</a>
+          </li>
+          <li class="navbar-dropdown-divider"></li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/backups" class="navbar-dropdown-link">Backups</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/pops" class="navbar-dropdown-link">POPs</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/nas" class="navbar-dropdown-link">NAS</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/admin/variables" class="navbar-dropdown-link">Variáveis</a>
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <!-- Ações Direita -->
+    <div class="navbar-actions">
+      <!-- Notificações -->
+      <button class="navbar-action-btn" aria-label="Notificações" data-notifications>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
+        <span class="notification-badge" style="display: none;">0</span>
+      </button>
+
+      <!-- Perfil -->
+      <div class="navbar-profile navbar-dropdown">
+        <button class="navbar-profile-btn navbar-menu-link">
+          <div class="profile-avatar">
+            <span>{{ current_user[0] if current_user else 'U' }}</span>
+          </div>
+          <span class="profile-name">{{ current_user if current_user else 'Usuário' }}</span>
+        </button>
+        <ul class="navbar-dropdown-menu dropdown-right">
+          <li class="navbar-dropdown-item">
+            <a href="/profile" class="navbar-dropdown-link">Meu Perfil</a>
+          </li>
+          <li class="navbar-dropdown-item">
+            <a href="/settings" class="navbar-dropdown-link">Configurações</a>
+          </li>
+          <li class="navbar-dropdown-divider"></li>
+          <li class="navbar-dropdown-item">
+            <a href="/logout" class="navbar-dropdown-link text-danger">Sair</a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Mobile Toggle -->
+      <button class="navbar-toggle" aria-label="Menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+    </div>
+  </div>
+</nav>
+
+<script>
+  // Injeta o token de acesso para uso nos scripts
+  window.apiToken = "{{ access_token }}";
+  window.apiBaseUrl = "{{ api_base_url }}";
+</script>

@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ocorrências / Suporte - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+
+      <!-- Breadcrumbs -->
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item"><a href="/admin/support">Suporte</a></span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Ocorrências</span>
+      </nav>
+
+      <!-- Page Header -->
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Ocorrências</h1>
+          <p class="page-subtitle">Gerenciamento de chamados e ocorrências técnicas</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-outline-primary" onclick="refreshData()">
+            <span aria-hidden="true">🔄</span> Atualizar
+          </button>
+          <button type="button" class="btn btn-primary" onclick="openCreateModal()">
+            <span aria-hidden="true">➕</span> Nova Ocorrência
+          </button>
+        </div>
+      </header>
+
+      {% if message %}
+      <div class="alert alert-success" role="alert">
+        <strong>Sucesso!</strong> {{ message }}
+      </div>
+      {% endif %}
+
+      <!-- Filters -->
+      <div id="filter-container"></div>
+
+      <!-- Data Table -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Lista de Ocorrências</h2>
+        </div>
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="pagination-container"></div>
+
+    </div>
+  </main>
+
+  <!-- Modal: Create/Edit Occurrence -->
+  <div id="modal-occurrence" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 600px; width: 90%;">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Nova Ocorrência</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-occurrence" method="POST" action="/admin/support/occurrences">
+          <input type="hidden" name="occurrence_id" id="occurrence_id">
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="client_id">Cliente (ID)</label>
+              <input type="number" class="form-control" id="client_id" name="client_id" required>
+            </div>
+            <div class="form-group">
+              <label for="contract_id">Contrato (ID)</label>
+              <input type="number" class="form-control" id="contract_id" name="contract_id">
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="category">Categoria</label>
+              <select class="form-control" id="category" name="category">
+                <option value="general">Geral</option>
+                <option value="technical">Técnico</option>
+                <option value="financial">Financeiro</option>
+                <option value="commercial">Comercial</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="severity">Severidade</label>
+              <select class="form-control" id="severity" name="severity">
+                <option value="low">Baixa</option>
+                <option value="medium" selected>Média</option>
+                <option value="high">Alta</option>
+                <option value="critical">Crítica</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="description">Descrição</label>
+            <textarea class="form-control" id="description" name="description" rows="4" required></textarea>
+          </div>
+
+          <div class="form-group" id="status-group" style="display: none;">
+            <label for="status">Status</label>
+            <select class="form-control" id="status" name="status">
+              <option value="open">Aberto</option>
+              <option value="closed">Fechado</option>
+            </select>
+          </div>
+
+          <div class="form-actions" style="margin-top: 20px; text-align: right;">
+            <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {% include 'components/footer.html' %}
+
+  <!-- JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      // Data passed from Flask
+      const itemsData = [
+        {% for item in items %}
+        {
+          id: {{ item.id }},
+          client_id: {{ item.client_id or 'null' }},
+          contract_id: {{ item.contract_id or 'null' }},
+          category: {{ item.category | tojson }},
+          severity: {{ item.severity | tojson }},
+          description: {{ item.description | tojson }},
+          status: {{ item.status | tojson }},
+          created_at: {{ (item.created_at.strftime("%d/%m/%Y %H:%M") if item.created_at else "") | tojson }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ];
+
+      // Filters
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          { name: 'status', label: 'Status', type: 'select', options: [{value: 'open', label: 'Aberto'}, {value: 'closed', label: 'Fechado'}] },
+          { name: 'client_id', label: 'Cliente ID', type: 'number' },
+          { name: 'severity', label: 'Severidade', type: 'select', options: [{value: 'high', label: 'Alta'}, {value: 'critical', label: 'Crítica'}] }
+        ],
+        onApply: function(filters) {
+          let filtered = itemsData;
+          if (filters.status) filtered = filtered.filter(i => i.status === filters.status);
+          if (filters.client_id) filtered = filtered.filter(i => i.client_id == filters.client_id);
+          if (filters.severity) filtered = filtered.filter(i => i.severity === filters.severity);
+          dataTable.update(filtered);
+          pagination.updateTotal(filtered.length);
+        },
+        onReset: function() {
+          dataTable.update(itemsData);
+          pagination.updateTotal(itemsData.length);
+        }
+      });
+
+      // DataTable
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'ID', sortable: true },
+          { field: 'client_id', label: 'Cliente', sortable: true },
+          { field: 'contract_id', label: 'Contrato', sortable: true },
+          { 
+            field: 'category', 
+            label: 'Categoria',
+            render: val => `<span class="badge badge-secondary">${val}</span>`
+          },
+          { 
+            field: 'severity', 
+            label: 'Severidade',
+            render: val => {
+                const colors = {low: 'info', medium: 'warning', high: 'danger', critical: 'dark'};
+                return `<span class="badge badge-${colors[val] || 'secondary'}">${val}</span>`;
+            }
+          },
+          { 
+            field: 'status', 
+            label: 'Status',
+            render: val => {
+                const cls = val === 'open' ? 'success' : 'secondary';
+                return `<span class="status-indicator ${cls}"><span class="status-dot"></span>${val}</span>`;
+            }
+          },
+          { field: 'created_at', label: 'Criado em', sortable: true }
+        ],
+        data: itemsData,
+        actions: [
+          {
+            name: 'edit',
+            label: 'Editar',
+            icon: '✏️',
+            handler: row => openEditModal(row)
+          },
+          {
+              name: 'delete',
+              label: 'Excluir',
+              icon: '🗑️',
+              handler: row => deleteItem(row.id)
+          }
+        ]
+      });
+
+      // Pagination
+      const pagination = new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: itemsData.length,
+        currentPage: 1,
+        pageSize: 10,
+        onPageChange: (page, size) => console.log('Page:', page)
+      });
+
+      // Global Functions
+      window.openCreateModal = function() {
+        document.getElementById('form-occurrence').reset();
+        document.getElementById('occurrence_id').value = '';
+        document.getElementById('modal-title').textContent = 'Nova Ocorrência';
+        document.getElementById('status-group').style.display = 'none';
+        ISP_ERP.openModal('modal-occurrence');
+      };
+
+      window.openEditModal = function(row) {
+        document.getElementById('occurrence_id').value = row.id;
+        document.getElementById('client_id').value = row.client_id;
+        document.getElementById('contract_id').value = row.contract_id || '';
+        document.getElementById('category').value = row.category;
+        document.getElementById('severity').value = row.severity;
+        document.getElementById('description').value = row.description;
+        document.getElementById('status').value = row.status;
+        
+        document.getElementById('modal-title').textContent = 'Editar Ocorrência #' + row.id;
+        document.getElementById('status-group').style.display = 'block';
+        
+        ISP_ERP.openModal('modal-occurrence');
+      };
+      
+      window.deleteItem = function(id) {
+          if(!confirm('Tem certeza que deseja excluir esta ocorrência?')) return;
+          
+          fetch(`/admin/support/occurrences/delete/${id}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    ISP_AdvancedComponents.Toast.success('Ocorrência excluída');
+                    setTimeout(() => window.location.reload(), 1000);
+                } else {
+                    ISP_AdvancedComponents.Toast.error('Erro ao excluir');
+                }
+            })
+            .catch(err => console.error(err));
+      };
+
+      window.refreshData = function() {
+        window.location.reload();
+      };
+    });
+  </script>
+</body>
+</html>

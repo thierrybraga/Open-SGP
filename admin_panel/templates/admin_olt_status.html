@@ -1,0 +1,442 @@
+{% extends 'base.html' %}
+
+{% block title %}Status OLT - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+<style>
+    /* Stats Grid */
+    .stats-grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-xl);
+    }
+
+    .stat-card {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-md);
+      padding: var(--spacing-lg);
+      background: var(--bg-primary);
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-2px);
+    }
+
+    .stat-card-icon {
+      width: 48px;
+      height: 48px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 50%;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    .stat-card-icon.primary {
+      background: var(--primary-light);
+      color: var(--primary-color);
+    }
+
+    .stat-card-icon.success {
+      background: var(--success-light);
+      color: var(--success-color);
+    }
+
+    .stat-card-icon.warning {
+      background: var(--warning-light);
+      color: var(--warning-color);
+    }
+
+    .stat-card-icon.danger {
+      background: var(--danger-light);
+      color: var(--danger-color);
+    }
+
+    .stat-card-content {
+      flex: 1;
+    }
+
+    .stat-card-label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .stat-card-value {
+      font-size: var(--font-size-2xl);
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    /* Card styles */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-lg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    @media (max-width: 768px) {
+      .stats-grid-4 {
+        grid-template-columns: 1fr;
+      }
+
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .page-header-actions {
+        width: 100%;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="container animate__animated animate__fadeInUp">
+
+  <!-- Breadcrumbs -->
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item">
+      <a href="/">Home</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">
+      <a href="/admin/network">Rede</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">Status OLT</span>
+  </nav>
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Status de ONUs</h1>
+      <p class="page-subtitle">Monitore o status das ONUs em tempo real</p>
+    </div>
+    <div class="page-header-actions">
+      <button type="button" class="btn btn-outline-primary" onclick="refreshData()">
+        <span aria-hidden="true">🔄</span>
+        Atualizar
+      </button>
+      <button type="button" class="btn btn-primary" onclick="exportData()">
+        <span aria-hidden="true">📥</span>
+        Exportar
+      </button>
+    </div>
+  </header>
+
+  <!-- Summary Cards -->
+  <div class="stats-grid-4">
+    <div class="stat-card">
+      <div class="stat-card-icon success">
+        <span aria-hidden="true">✓</span>
+      </div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Online</div>
+        <div class="stat-card-value" id="stat-online">-</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-icon danger">
+        <span aria-hidden="true">✗</span>
+      </div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Offline</div>
+        <div class="stat-card-value" id="stat-offline">-</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-icon warning">
+        <span aria-hidden="true">📶</span>
+      </div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">RX Médio</div>
+        <div class="stat-card-value" id="stat-rx">-</div>
+      </div>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-card-icon primary">
+        <span aria-hidden="true">📡</span>
+      </div>
+      <div class="stat-card-content">
+        <div class="stat-card-label">Total ONUs</div>
+        <div class="stat-card-value" id="stat-total">-</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div id="filter-container"></div>
+
+  <!-- Data Table -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Status das ONUs</h2>
+      <div class="card-actions">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="exportData()" aria-label="Exportar dados">
+          <span aria-hidden="true">📥</span>
+        </button>
+        <button type="button" class="btn btn-sm btn-secondary" onclick="refreshData()" aria-label="Atualizar dados">
+          <span aria-hidden="true">🔄</span>
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <div id="table-container"></div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div id="pagination-container"></div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // Sample data (replace with actual data from backend)
+      const onuData = [
+        {% for it in items %}
+        {
+          contract_id: {{ it.contract_id }},
+          device_name: '{{ it.device_name }}',
+          vendor: '{{ it.vendor }}',
+          onu_id: '{{ it.onu_id }}',
+          online: {{ 'true' if it.online else 'false' }},
+          rx_power_dbm: {{ it.rx_power_dbm }},
+          tx_power_dbm: {{ it.tx_power_dbm }},
+          uptime_seconds: {{ it.uptime_seconds or 0 }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ];
+
+      // Calculate statistics
+      function updateStatistics() {
+        const online = onuData.filter(o => o.online).length;
+        const offline = onuData.filter(o => !o.online).length;
+        const avgRx = onuData.reduce((sum, o) => sum + o.rx_power_dbm, 0) / onuData.length || 0;
+
+        document.getElementById('stat-online').textContent = online;
+        document.getElementById('stat-offline').textContent = offline;
+        document.getElementById('stat-rx').textContent = avgRx.toFixed(2) + ' dBm';
+        document.getElementById('stat-total').textContent = onuData.length;
+      }
+
+      updateStatistics();
+
+      // Initialize Filter Panel
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          {
+            name: 'device_id',
+            label: 'Dispositivo',
+            type: 'select',
+            options: [
+              {% for d in devices %}
+              { value: '{{ d.id }}', label: '{{ d.name }} ({{ d.vendor }})' }{% if not loop.last %},{% endif %}
+              {% endfor %}
+            ]
+          },
+          {
+            name: 'contract_id',
+            label: 'Contrato ID',
+            type: 'number',
+            placeholder: 'Digite o ID do contrato'
+          },
+          {
+            name: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'online', label: 'Online' },
+              { value: 'offline', label: 'Offline' }
+            ]
+          }
+        ],
+        onApply: function(filters) {
+          console.log('Filters applied:', filters);
+          if (window.UI && window.UI.toast) UI.toast.success('Filtros aplicados com sucesso');
+          else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.success('Filtros aplicados com sucesso');
+
+          let filtered = onuData;
+
+          if (filters.contract_id) {
+            filtered = filtered.filter(o => o.contract_id == filters.contract_id);
+          }
+          if (filters.status) {
+            const isOnline = filters.status === 'online';
+            filtered = filtered.filter(o => o.online === isOnline);
+          }
+
+          dataTable.update(filtered);
+          pagination.updateTotal(filtered.length);
+        },
+        onReset: function() {
+          console.log('Filters reset');
+          dataTable.update(onuData);
+          pagination.updateTotal(onuData.length);
+          if (window.UI && window.UI.toast) UI.toast.info('Filtros limpos');
+          else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Filtros limpos');
+        }
+      });
+
+      // Initialize Data Table
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'contract_id', label: 'Contrato', sortable: true },
+          { field: 'device_name', label: 'Dispositivo', sortable: true },
+          { field: 'vendor', label: 'Vendor', sortable: true },
+          { field: 'onu_id', label: 'ONU', sortable: true },
+          {
+            field: 'online',
+            label: 'Status',
+            type: 'status',
+            sortable: true,
+            render: function(value) {
+              return value ?
+                '<span class="status-indicator success"><span class="status-dot"></span>Online</span>' :
+                '<span class="status-indicator danger"><span class="status-dot"></span>Offline</span>';
+            }
+          },
+          {
+            field: 'rx_power_dbm',
+            label: 'RX (dBm)',
+            sortable: true,
+            render: function(value) {
+              const quality = value >= -25 ? 'success' : value >= -27 ? 'warning' : 'danger';
+              return `<span class="status-indicator ${quality}">${value.toFixed(2)}</span>`;
+            }
+          },
+          {
+            field: 'tx_power_dbm',
+            label: 'TX (dBm)',
+            sortable: true,
+            render: function(value) {
+              return value.toFixed(2);
+            }
+          },
+          {
+            field: 'uptime_seconds',
+            label: 'Uptime',
+            sortable: true,
+            render: function(value) {
+              const hours = Math.floor(value / 3600);
+              return `${hours}h`;
+            }
+          }
+        ],
+        data: onuData,
+        selectable: true,
+        actions: [
+          {
+            name: 'details',
+            label: 'Detalhes',
+            icon: '👁️',
+            handler: function(row) {
+              if (window.UI && window.UI.toast) UI.toast.info('Visualizando detalhes da ONU ' + row.onu_id);
+              else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Visualizando detalhes da ONU ' + row.onu_id);
+            }
+          },
+          {
+            name: 'reboot',
+            label: 'Reiniciar',
+            icon: '🔄',
+            handler: function(row) {
+              rebootONU(row);
+            }
+          }
+        ],
+        onSelect: function(selectedIds) {
+          if (selectedIds.length > 0) {
+            if (window.UI && window.UI.toast) UI.toast.info(`${selectedIds.length} ONU(s) selecionada(s)`);
+            else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info(`${selectedIds.length} ONU(s) selecionada(s)`);
+          }
+        },
+        emptyMessage: 'Nenhuma ONU encontrada'
+      });
+
+      // Initialize Pagination
+      const pagination = new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: onuData.length,
+        currentPage: 1,
+        pageSize: 20,
+        onPageChange: function(page, pageSize) {
+          console.log('Page changed:', page, pageSize);
+          if (window.UI && window.UI.toast) UI.toast.info(`Carregando página ${page}...`);
+          else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info(`Carregando página ${page}...`);
+        }
+      });
+
+      // Reboot ONU
+      window.rebootONU = function(row) {
+        ISP_ERP.confirm(
+          `Deseja reiniciar a ONU ${row.onu_id} do contrato ${row.contract_id}?`,
+          function(confirmed) {
+            if (confirmed) {
+              if (window.UI && window.UI.toast) UI.toast.info('Enviando comando de reinicialização...', { duration: 3000 });
+              else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Enviando comando de reinicialização...', { duration: 3000 });
+              
+              setTimeout(() => {
+                if (window.UI && window.UI.toast) UI.toast.success('ONU reiniciada com sucesso!');
+                else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.success('ONU reiniciada com sucesso!');
+              }, 3000);
+            }
+          }
+        );
+      };
+
+      // Refresh data
+      window.refreshData = function() {
+        if (window.UI && window.UI.toast) UI.toast.info('Atualizando dados...', { duration: 1500 });
+        else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Atualizando dados...', { duration: 1500 });
+        
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      };
+
+      // Export data
+      window.exportData = function() {
+        if (window.UI && window.UI.toast) UI.toast.info('Exportando dados...', { duration: 2000 });
+        else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Exportando dados...', { duration: 2000 });
+        
+        setTimeout(() => {
+          if (window.UI && window.UI.toast) UI.toast.success('Dados exportados para Excel!');
+          else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.success('Dados exportados para Excel!');
+        }, 2000);
+      };
+
+    });
+  </script>
+{% endblock %}

@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Editar Ocorrência</title>
+    <style>
+      form label { display:block; margin-bottom:6px; }
+    </style>
+  </head>
+  <body>
+    <h1>Editar Ocorrência</h1>
+    {% if message %}
+    <div style="background:#e6ffed;border:1px solid #b7eb8f;padding:8px;margin-bottom:8px;">{{ message }}</div>
+    {% endif %}
+    {% if error %}
+    <div style="background:#fff1f0;border:1px solid #ffccc7;padding:8px;margin-bottom:8px;">{{ error }}</div>
+    {% endif %}
+    {% if occurrence %}
+    <form method="post">
+      <label>Status
+        <input name="status" value="{{ occurrence.status }}" />
+      </label>
+      <label>Severidade
+        <input name="severity" value="{{ occurrence.severity }}" />
+      </label>
+      <label>Descrição
+        <input name="description" value="{{ occurrence.description }}" style="width:420px" />
+      </label>
+      <label>Ticket ID
+        <input name="ticket_id" value="{{ occurrence.ticket_id or '' }}" />
+      </label>
+      <label>OS ID
+        <input name="service_order_id" value="{{ occurrence.service_order_id or '' }}" />
+      </label>
+      <button type="submit">Salvar</button>
+    </form>
+    {% endif %}
+    <p><a href="/admin/support/occurrences">Voltar</a></p>
+  </body>
+</html>

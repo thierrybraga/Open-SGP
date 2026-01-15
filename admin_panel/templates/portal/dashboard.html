@@ -1,0 +1,41 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Dashboard - Portal do Cliente{% endblock %}
+
+{% block content %}
+<header style="margin-bottom: 2rem;">
+    <h1>Olá, {{ client.name }}</h1>
+    <p class="text-muted">Bem-vindo à sua área exclusiva.</p>
+</header>
+
+<div class="stats-grid-2" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
+    <!-- Resumo Financeiro -->
+    <div class="portal-card">
+        <h3>Faturas em Aberto</h3>
+        <div style="font-size: 2rem; font-weight: bold; color: var(--danger-color); margin: 1rem 0;">
+            {{ profile.titles_overdue }}
+        </div>
+        <p>Valor Total: R$ {{ "%.2f"|format(profile.amount_overdue) }}</p>
+        <a href="/portal/invoices" class="btn btn-outline-primary" style="width: 100%; margin-top: 1rem;">Ver Faturas</a>
+    </div>
+
+    <!-- Meus Contratos -->
+    <div class="portal-card">
+        <h3>Meus Serviços</h3>
+        <div style="font-size: 2rem; font-weight: bold; color: var(--success-color); margin: 1rem 0;">
+            {{ profile.contracts_active }}
+        </div>
+        <p>Contratos Ativos</p>
+        <button class="btn btn-outline-secondary" style="width: 100%; margin-top: 1rem;" disabled>Gerenciar</button>
+    </div>
+</div>
+
+<div class="portal-card" style="margin-top: 1.5rem;">
+    <h3>Ações Rápidas</h3>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
+        <a href="/portal/support" class="btn btn-secondary">📞 Abrir Chamado</a>
+        <a href="/portal/invoices" class="btn btn-secondary">📄 2ª Via de Boleto</a>
+        <button class="btn btn-secondary" onclick="alert('Funcionalidade de desbloqueio em desenvolvimento')">🔓 Desbloqueio de Confiança</button>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Histórico de Comunicação - ISP ERP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item"><a href="/communication/queue">Comunicação</a></span><span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">Histórico de Comunicação</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Histórico de Comunicação</h1>
+          <p class="page-subtitle">Visualize o histórico de mensagens enviadas</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-primary" onclick="window.location.href='/communication/queue'">
+            <span aria-hidden="true">➡️</span>
+            Ver Fila
+          </button>
+        </div>
+      </header>
+
+      <div class="card">
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+      
+      <!-- Pagination handled by DataTable or server side usually, keeping simple here -->
+      <div style="margin-top: 1rem; text-align: center;">
+        <small class="text-muted">Mostrando os últimos 100 registros</small>
+      </div>
+    </div>
+  </main>
+
+  {% include 'components/footer.html' %}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    const historyData = [
+      {% for item in items %}
+      {
+        id: {{ item.id }},
+        channel: '{{ item.channel }}',
+        destination: '{{ item.destination }}',
+        content: '{{ item.content | replace("'", "\\'") | replace("\n", " ") | truncate(50) }}',
+        status: '{{ item.status }}',
+        sent_at: '{{ item.dispatched_at.strftime("%d/%m/%Y %H:%M") if item.dispatched_at else "-" }}',
+        error: '{{ item.error or "" }}'
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'ID', sortable: true },
+          { field: 'channel', label: 'Canal', sortable: true },
+          { field: 'destination', label: 'Destino' },
+          { field: 'content', label: 'Conteúdo' },
+          { 
+            field: 'status', 
+            label: 'Status', 
+            render: (val) => {
+              const map = { 'sent': 'success', 'failed': 'error', 'queued': 'warning' };
+              const cls = map[val] || 'secondary';
+              return `<span class="status-indicator ${cls}">${val}</span>`;
+            }
+          },
+          { field: 'sent_at', label: 'Enviado Em', sortable: true },
+          { field: 'error', label: 'Erro' }
+        ],
+        data: historyData,
+        pagination: true,
+        itemsPerPage: 15,
+        emptyMessage: 'Nenhum histórico encontrado'
+      });
+      
+    });
+  </script>
+</body>
+</html>

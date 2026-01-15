@@ -1,0 +1,373 @@
+{% extends 'base.html' %}
+
+{% block title %}Ocorrências - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+{% endblock %}
+
+{% block content %}
+<div class="container animate__animated animate__fadeInUp">
+
+  <!-- Breadcrumbs -->
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item">
+      <a href="/">Home</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">
+      <a href="/admin/support">Suporte</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">Ocorrências</span>
+  </nav>
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Ocorrências</h1>
+      <p class="page-subtitle">Gerencie todas as ocorrências de suporte do sistema</p>
+    </div>
+    <div class="page-header-actions">
+      <button type="button" class="btn btn-primary" onclick="resetOccurrenceForm(); ISP_ERP.openModal('modal-new-occurrence')">
+        <span aria-hidden="true">➕</span>
+        Nova Ocorrência
+      </button>
+    </div>
+  </header>
+
+  <!-- Filters -->
+  <div id="filter-container"></div>
+
+  <!-- Data Table Container -->
+  <div class="card">
+    <div class="card-body">
+      <div id="table-container"></div>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  <div id="pagination-container"></div>
+
+</div>
+
+<!-- Modal: New Occurrence -->
+<div id="modal-new-occurrence" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Nova Ocorrência</h2>
+      <button class="modal-close" aria-label="Fechar modal" onclick="ISP_ERP.closeModal('modal-new-occurrence')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-occurrence" method="post" action="/admin/support/occurrences" data-validate>
+        <input type="hidden" name="id" id="occurrence-id" />
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="client-id" class="form-label required">Cliente ID</label>
+            <input type="number" id="client-id" name="client_id" class="form-control" required aria-required="true" placeholder="ID do Cliente" />
+          </div>
+
+          <div class="form-group">
+            <label for="contract-id" class="form-label">Contrato ID</label>
+            <input type="number" id="contract-id" name="contract_id" class="form-control" placeholder="ID do Contrato" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="category" class="form-label required">Categoria</label>
+            <select id="category" name="category" class="form-select" required aria-required="true">
+              <option value="">Selecione...</option>
+              <option value="general">Geral</option>
+              <option value="technical">Técnica</option>
+              <option value="billing">Financeiro</option>
+              <option value="complaint">Reclamação</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="severity" class="form-label required">Severidade</label>
+            <select id="severity" name="severity" class="form-select" required aria-required="true">
+              <option value="">Selecione...</option>
+              <option value="low">Baixa</option>
+              <option value="medium" selected>Média</option>
+              <option value="high">Alta</option>
+              <option value="critical">Crítica</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="status" class="form-label required">Status</label>
+            <select id="status" name="status" class="form-select" required aria-required="true">
+              <option value="">Selecione...</option>
+              <option value="open" selected>Aberto</option>
+              <option value="in_progress">Em Andamento</option>
+              <option value="resolved">Resolvido</option>
+              <option value="closed">Fechado</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="ticket-id" class="form-label">Ticket ID</label>
+            <input type="text" id="ticket-id" name="ticket_id" class="form-control" placeholder="Opcional" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="service-order-id" class="form-label">Ordem de Serviço ID</label>
+          <input type="number" id="service-order-id" name="service_order_id" class="form-control" placeholder="Opcional" />
+        </div>
+
+        <div class="form-group">
+          <label for="description" class="form-label required">Descrição</label>
+          <textarea id="description" name="description" class="form-control" rows="4" required aria-required="true" placeholder="Descreva a ocorrência..."></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="ISP_ERP.closeModal('modal-new-occurrence')">Cancelar</button>
+      <button type="submit" form="form-occurrence" class="btn btn-primary">Salvar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+<script>
+  // Initialize page
+  document.addEventListener('DOMContentLoaded', function() {
+    
+    // Convert Flask flash messages to Toasts
+    {% if message %}
+    if (window.UI && window.UI.toast) {
+        UI.toast.success("{{ message }}");
+    } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+        ISP_AdvancedComponents.Toast.success("{{ message }}");
+    }
+    {% endif %}
+
+    {% if error %}
+    if (window.UI && window.UI.toast) {
+        UI.toast.error("{{ error }}");
+    } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+        ISP_AdvancedComponents.Toast.error("{{ error }}");
+    }
+    {% endif %}
+
+    // Data from backend (Manually constructed for safety)
+    const items = [
+      {% for o in items %}
+      {
+        id: {{ o.id }},
+        client_id: {{ o.client_id or 'null' }},
+        contract_id: {{ o.contract_id or 'null' }},
+        category: "{{ o.category }}",
+        severity: "{{ o.severity }}",
+        status: "{{ o.status }}",
+        ticket_id: "{{ o.ticket_id or '' }}",
+        service_order_id: "{{ o.service_order_id or '' }}",
+        description: `{{ o.description | replace('`', '') | replace('"', '\\"') }}`
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    // Initialize Filter Panel
+    const filterPanel = new ISP_Components.FilterPanel({
+      container: '#filter-container',
+      filters: [
+        {
+          name: 'status',
+          label: 'Status',
+          type: 'select',
+          options: [
+            { value: 'open', label: 'Aberto' },
+            { value: 'in_progress', label: 'Em Andamento' },
+            { value: 'resolved', label: 'Resolvido' },
+            { value: 'closed', label: 'Fechado' }
+          ]
+        },
+        {
+          name: 'severity',
+          label: 'Severidade',
+          type: 'select',
+          options: [
+            { value: 'low', label: 'Baixa' },
+            { value: 'medium', label: 'Média' },
+            { value: 'high', label: 'Alta' },
+            { value: 'critical', label: 'Crítica' }
+          ]
+        },
+        {
+          name: 'category',
+          label: 'Categoria',
+          type: 'select',
+          options: [
+            { value: 'general', label: 'Geral' },
+            { value: 'technical', label: 'Técnica' },
+            { value: 'billing', label: 'Financeiro' },
+            { value: 'complaint', label: 'Reclamação' }
+          ]
+        },
+        {
+          name: 'contract_id',
+          label: 'Contrato ID',
+          type: 'number',
+          placeholder: 'Digite o ID do contrato'
+        },
+        {
+          name: 'client_id',
+          label: 'Cliente ID',
+          type: 'number',
+          placeholder: 'Digite o ID do cliente'
+        }
+      ],
+      onApply: function(filters) {
+        const params = new URLSearchParams(window.location.search);
+        Object.keys(filters).forEach(key => {
+           if(filters[key]) params.set(key, filters[key]);
+           else params.delete(key);
+        });
+        window.location.search = params.toString();
+      },
+      onReset: function() {
+        window.location.href = window.location.pathname;
+      }
+    });
+
+    // Initialize Data Table
+    const dataTable = new ISP_Components.DataTable({
+      container: '#table-container',
+      columns: [
+        { field: 'id', label: 'ID', sortable: true },
+        { field: 'client_id', label: 'Cliente', sortable: true },
+        { field: 'contract_id', label: 'Contrato', sortable: true },
+        { field: 'category', label: 'Categoria', sortable: true },
+        { field: 'severity', label: 'Severidade', sortable: true },
+        {
+          field: 'status',
+          label: 'Status',
+          type: 'status',
+          sortable: true
+        },
+        { field: 'ticket_id', label: 'Ticket', sortable: false },
+        { field: 'service_order_id', label: 'OS', sortable: false },
+        { field: 'description', label: 'Descrição', sortable: false }
+      ],
+      data: items,
+      selectable: true,
+      actions: [
+        {
+          name: 'edit',
+          label: 'Editar',
+          icon: '✏️',
+          variant: '',
+          handler: function(row) {
+            window.location.href = `/admin/support/occurrences/edit/${row.id}`;
+          }
+        },
+        {
+          name: 'close',
+          label: 'Fechar',
+          icon: '✅',
+          variant: 'success',
+          handler: function(row) {
+              if(row.status !== 'closed') {
+                  // Redirect to close endpoint or handle via fetch
+                  window.location.href = `/admin/support/occurrences/close/${row.id}`;
+              }
+          }
+        }
+      ],
+      onSelect: function(selectedIds) {
+        console.log('Selected rows:', selectedIds);
+      },
+      emptyMessage: 'Nenhuma ocorrência encontrada'
+    });
+
+    // Initialize Pagination (Simplified)
+    // Assuming backend handles pagination via query params, we just show simple prev/next or use the component if we have total count
+    // Since we don't have total count in template context explicitly in the snippet, we might skip or assume items.length
+    // If we want real pagination, we need total_pages or total_items from backend.
+    // For now, let's just instantiate it if we had that info, or omit if not provided.
+    // The original template didn't have pagination controls (just listed all).
+    // The modern template hardcoded total: items.length, which implies client-side pagination or just showing current page info.
+    const pagination = new ISP_Components.Pagination({
+      container: '#pagination-container',
+      total: items.length, 
+      currentPage: 1,
+      pageSize: 100
+    });
+
+    // Form validation
+    const formValidator = new ISP_Components.FormValidator('#form-occurrence', {
+      client_id: {
+        required: true,
+        number: true,
+        messages: {
+          required: 'Cliente ID é obrigatório',
+          number: 'Digite um número válido'
+        }
+      },
+      category: {
+        required: true,
+        messages: {
+          required: 'Selecione uma categoria'
+        }
+      },
+      severity: {
+        required: true,
+        messages: {
+          required: 'Selecione a severidade'
+        }
+      },
+      status: {
+        required: true,
+        messages: {
+          required: 'Selecione o status'
+        }
+      },
+      description: {
+        required: true,
+        minLength: 5,
+        messages: {
+          required: 'Descrição é obrigatória',
+          minLength: 'Mínimo de 5 caracteres'
+        }
+      }
+    });
+    window.formValidator = formValidator; // Make global
+
+    // Form submission
+    document.getElementById('form-occurrence').addEventListener('submit', function(e) {
+      if (!formValidator.validate()) {
+        e.preventDefault();
+        return;
+      }
+      // Allow default form submission
+    });
+
+    // Reset form helper
+    window.resetOccurrenceForm = () => {
+      document.getElementById('form-occurrence').reset();
+      if (window.formValidator) window.formValidator.reset();
+      document.getElementById('modal-title').textContent = 'Nova Ocorrência';
+    };
+
+    // Legacy listener removed
+    /*
+    document.querySelectorAll('[data-modal-close]').forEach(btn => {
+      btn.addEventListener('click', function() {
+        document.getElementById('form-occurrence').reset();
+        formValidator.reset();
+        document.getElementById('modal-title').textContent = 'Nova Ocorrência';
+      });
+    });
+    */
+
+  });
+</script>
+{% endblock %}

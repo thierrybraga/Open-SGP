@@ -1,0 +1,249 @@
+<!--
+Arquivo: admin_panel/templates/admin_support_ticket_detail.html
+
+Responsabilidade:
+Detalhes do ticket de suporte e histórico de mensagens.
+
+Integrações:
+- admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ticket #{{ ticket.protocol }} - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+  <style>
+    .message-thread {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .message-card {
+      border: 1px solid var(--border-color);
+      border-radius: var(--border-radius);
+      padding: 1rem;
+      background-color: var(--card-bg);
+    }
+    .message-card.internal {
+      background-color: rgba(255, 255, 0, 0.1);
+      border-color: #ffeeba;
+    }
+    .dark-mode .message-card.internal {
+      background-color: rgba(100, 100, 0, 0.2);
+      border-color: #665c2e;
+    }
+    .message-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 0.5rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+    .message-content {
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <!-- Skip Link -->
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+  <!-- Navigation -->
+  {% include 'components/navbar.html' %}
+
+  <!-- Main Content -->
+  <main id="main-content" class="main-content">
+    <div class="container">
+
+      <!-- Breadcrumbs -->
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item">
+          <a href="/">Home</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">
+          <a href="/admin/support/tickets">Tickets</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">#{{ ticket.protocol }}</span>
+      </nav>
+
+      <!-- Page Header -->
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Ticket #{{ ticket.protocol }}</h1>
+          <p class="page-subtitle">{{ ticket.subject }}</p>
+        </div>
+        <div class="page-header-actions">
+           <a href="{{ url_for('admin_support_ticket_create_os', ticket_id=ticket.id) }}" class="btn btn-primary" onclick="return confirm('Gerar Ordem de Serviço para este ticket?')">
+             🛠️ Gerar OS
+           </a>
+        </div>
+      </header>
+
+      <div class="grid" style="grid-template-columns: 2fr 1fr; gap: 2rem;">
+        
+        <!-- Main Column: Messages -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title">Histórico de Mensagens</h2>
+          </div>
+          <div class="card-body">
+            
+            <!-- Description -->
+            <div class="message-card">
+              <div class="message-header">
+                <strong>{{ ticket.client.name }}</strong>
+                <span>{{ ticket.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+              </div>
+              <div class="message-content">{{ ticket.description }}</div>
+            </div>
+
+            <!-- Thread -->
+            <div class="message-thread">
+              {% for msg in messages %}
+              <div class="message-card {% if msg.is_internal %}internal{% endif %}">
+                <div class="message-header">
+                  <strong>
+                    {% if msg.user %}
+                      {{ msg.user.username }} ({{ 'Interno' if msg.is_internal else 'Público' }})
+                    {% else %}
+                      Sistema / Cliente
+                    {% endif %}
+                  </strong>
+                  <span>{{ msg.created_at.strftime("%d/%m/%Y %H:%M") }}</span>
+                </div>
+                <div class="message-content">{{ msg.content }}</div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- New Message Form -->
+            <hr style="margin: 2rem 0; border-color: var(--border-color);">
+            
+            <form method="post" action="{{ url_for('admin_support_ticket_reply', ticket_id=ticket.id) }}">
+              <div class="form-group">
+                <label for="content" class="form-label required">Nova Resposta</label>
+                <textarea id="content" name="content" class="form-control" rows="4" required></textarea>
+              </div>
+              
+              <div class="form-group">
+                <label class="form-checkbox">
+                  <input type="checkbox" name="is_internal" />
+                  <span>Nota Interna (Invisível para o cliente)</span>
+                </label>
+              </div>
+
+              <button type="submit" class="btn btn-primary">Enviar Resposta</button>
+            </form>
+
+          </div>
+        </div>
+
+        <!-- Side Column: Info & Status -->
+        <div>
+          <div class="card">
+            <div class="card-header">
+              <h2 class="card-title">Informações</h2>
+            </div>
+            <div class="card-body">
+              <form method="post" action="{{ url_for('admin_support_ticket_update', ticket_id=ticket.id) }}">
+                
+                <div class="form-group">
+                  <label class="form-label">Status</label>
+                  <select name="status" class="form-control" onchange="this.form.submit()">
+                    <option value="open" {% if ticket.status == 'open' %}selected{% endif %}>Aberto</option>
+                    <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>Em Progresso</option>
+                    <option value="pending" {% if ticket.status == 'pending' %}selected{% endif %}>Pendente</option>
+                    <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>Fechado</option>
+                    <option value="canceled" {% if ticket.status == 'canceled' %}selected{% endif %}>Cancelado</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Prioridade</label>
+                  <select name="priority" class="form-control" onchange="this.form.submit()">
+                    <option value="low" {% if ticket.priority == 'low' %}selected{% endif %}>Baixa</option>
+                    <option value="normal" {% if ticket.priority == 'normal' %}selected{% endif %}>Normal</option>
+                    <option value="high" {% if ticket.priority == 'high' %}selected{% endif %}>Alta</option>
+                    <option value="critical" {% if ticket.priority == 'critical' %}selected{% endif %}>Crítica</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label class="form-label">Atendente</label>
+                  <select name="assignee_id" class="form-control" onchange="this.form.submit()">
+                    <option value="">Ninguém</option>
+                    {% for user in users %}
+                    <option value="{{ user.id }}" {% if ticket.assignee_id == user.id %}selected{% endif %}>{{ user.username }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                 <div class="form-group">
+                  <label class="form-label">Categoria</label>
+                  <select name="category_id" class="form-control" onchange="this.form.submit()">
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if ticket.category_id == cat.id %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+              </form>
+
+              <hr>
+
+              <dl class="description-list">
+                <dt>Cliente</dt>
+                <dd><a href="/admin/clients/{{ ticket.client_id }}">{{ ticket.client.name }}</a></dd>
+                
+                {% if ticket.contract %}
+                <dt>Contrato</dt>
+                <dd><a href="/admin/contracts">{{ ticket.contract.id }}</a></dd>
+                {% endif %}
+
+                <dt>Origem</dt>
+                <dd>{{ ticket.origin }}</dd>
+
+                <dt>Criado em</dt>
+                <dd>{{ ticket.created_at.strftime("%d/%m/%Y %H:%M") }}</dd>
+                
+                {% if ticket.closed_at %}
+                <dt>Fechado em</dt>
+                <dd>{{ ticket.closed_at.strftime("%d/%m/%Y %H:%M") }}</dd>
+                {% endif %}
+              </dl>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  {% include 'components/footer.html' %}
+
+  <!-- JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+</body>
+</html>

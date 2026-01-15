@@ -1,0 +1,91 @@
+<!--
+Arquivo: admin_panel/templates/admin_reports_growth.html
+Responsabilidade: Relatório de Crescimento (Novos Clientes, Cancelamentos)
+Integrações: admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Relatório de Crescimento - ISP ERP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Relatórios</span>
+        <span class="breadcrumb-separator">/</span>
+        <span class="breadcrumb-item">Crescimento</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Relatório de Crescimento</h1>
+          <p class="page-subtitle">Novos contratos, cancelamentos e churn rate</p>
+        </div>
+      </header>
+
+      <div class="stats-grid-4">
+        <div class="stat-card">
+          <div class="stat-card-icon success"><span aria-hidden="true">📈</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Novos Contratos (30d)</div>
+            <div class="stat-card-value">{{ data.new_contracts_30d|default(0) }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon danger"><span aria-hidden="true">📉</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Cancelamentos (30d)</div>
+            <div class="stat-card-value">{{ data.canceled_contracts_30d|default(0) }}</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon primary"><span aria-hidden="true">🔄</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Churn Rate (30d)</div>
+            <div class="stat-card-value">{{ "%.2f"|format(data.churn_rate|default(0)) }}%</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card-icon warning"><span aria-hidden="true">👥</span></div>
+          <div class="stat-card-content">
+            <div class="stat-card-label">Total Clientes</div>
+            <div class="stat-card-value">{{ data.total_clients|default(0) }}</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Histórico Recente</h2>
+        </div>
+        <div class="card-body">
+           <p class="text-muted">Gráfico de crescimento (simulado)</p>
+           <div style="height: 200px; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; border-radius: 8px;">
+              [ Gráfico de Barras: Entradas x Saídas ]
+           </div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  {% include 'components/footer.html' %}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+</body>
+</html>

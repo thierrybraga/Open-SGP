@@ -1,0 +1,107 @@
+<!--
+Arquivo: admin_panel/templates/index.html
+
+Responsabilidade:
+Página inicial do painel administrativo com links para módulos principais.
+
+Integrações:
+- admin_panel/app.py
+-->
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin ISP ERP</title>
+
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  </head>
+  <body>
+    <div class="main-wrapper">
+      <!-- Navbar -->
+      {% include 'components/navbar.html' %}
+
+      <!-- Conteúdo Principal -->
+      <main class="main-content">
+        <div class="breadcrumb">
+          <span class="breadcrumb-item">Home</span>
+        </div>
+
+        <h1>Bem-vindo ao ISP ERP</h1>
+        <p>Sistema completo de gestão para provedores de internet.</p>
+
+        <!-- Dashboard Cards -->
+        <div class="grid grid-auto-fit">
+          <!-- Dashboard -->
+          <a href="/dashboard" class="card-link">
+            <div class="dashboard-card">
+              <div class="dashboard-card-icon primary">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="3" width="7" height="7"></rect>
+                  <rect x="14" y="14" width="7" height="7"></rect>
+                  <rect x="3" y="14" width="7" height="7"></rect>
+                </svg>
+              </div>
+              <h3 class="dashboard-card-title">Dashboard</h3>
+              <p class="dashboard-card-subtitle">Visão geral do sistema</p>
+            </div>
+          </a>
+
+          <!-- Ordens de Serviço -->
+          <a href="/service-orders" class="card-link">
+            <div class="dashboard-card">
+              <div class="dashboard-card-icon success">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+              </div>
+              <h3 class="dashboard-card-title">Ordens de Serviço</h3>
+              <p class="dashboard-card-subtitle">Gerencie OS de técnicos</p>
+            </div>
+          </a>
+
+          <!-- Ocorrências -->
+          <a href="/admin/support/occurrences" class="card-link">
+            <div class="dashboard-card">
+              <div class="dashboard-card-icon warning">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                  <line x1="12" y1="9" x2="12" y2="13"></line>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </div>
+              <h3 class="dashboard-card-title">Ocorrências</h3>
+              <p class="dashboard-card-subtitle">Tickets de suporte</p>
+            </div>
+          </a>
+
+          <!-- Contratos Bloqueados -->
+          <a href="/network/blocked" class="card-link">
+            <div class="dashboard-card">
+              <div class="dashboard-card-icon danger">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </div>
+              <h3 class="dashboard-card-title">Contratos Bloqueados</h3>
+              <p class="dashboard-card-subtitle">Gestão de bloqueios</p>
+            </div>
+          </a>
+        </div>
+      </main>
+
+      <!-- Footer -->
+      {% include 'components/footer.html' %}
+    </div>
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+  </body>
+</html>

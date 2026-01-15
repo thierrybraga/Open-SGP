@@ -1,0 +1,70 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Suporte - Portal do Cliente{% endblock %}
+
+{% block content %}
+<div class="portal-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>Meus Chamados</h2>
+        <button class="btn btn-primary" onclick="document.getElementById('newTicketForm').style.display='block'">Novo Chamado</button>
+    </div>
+
+    <div id="newTicketForm" style="display: none; background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <h4>Novo Chamado</h4>
+        <form action="/portal/support/create" method="POST">
+            <div class="form-group">
+                <label>Assunto</label>
+                <input type="text" name="subject" class="form-control" required>
+            </div>
+            <div class="form-group">
+                <label>Categoria</label>
+                <select name="category" class="form-control">
+                    <option value="financial">Financeiro</option>
+                    <option value="technical">Técnico</option>
+                    <option value="commercial">Comercial</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Contrato (Opcional)</label>
+                <select name="contract_id" class="form-control">
+                    <option value="">Selecione...</option>
+                    {% for c in contracts %}
+                    <option value="{{ c.id }}">Contrato #{{ c.id }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="submit" class="btn btn-primary">Enviar</button>
+            <button type="button" class="btn btn-secondary" onclick="document.getElementById('newTicketForm').style.display='none'">Cancelar</button>
+        </form>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Protocolo</th>
+                <th>Assunto</th>
+                <th>Categoria</th>
+                <th>Status</th>
+                <th>Data</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ticket in tickets %}
+            <tr>
+                <td>#{{ ticket.id }}</td>
+                <td>{{ ticket.subject }}</td>
+                <td>{{ ticket.category }}</td>
+                <td>
+                    <span class="status-badge {{ 'status-success' if ticket.status == 'resolved' else 'status-warning' }}">
+                        {{ ticket.status }}
+                    </span>
+                </td>
+                <td>{{ ticket.created_at.strftime('%d/%m/%Y') }}</td>
+            </tr>
+            {% else %}
+            <tr><td colspan="5">Nenhum chamado registrado.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

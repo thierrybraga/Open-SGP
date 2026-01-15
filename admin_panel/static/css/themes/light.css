@@ -1,0 +1,63 @@
+/**
+ * light.css - Tema Claro
+ * Sistema de Design ISP ERP
+ */
+
+:root {
+  /* Paleta de Cores Principal (Light Mode) */
+  --primary-color: #2563eb;       /* Blue 600 */
+  --primary-hover: #1d4ed8;       /* Blue 700 */
+  --primary-active: #1e40af;      /* Blue 800 */
+  --primary-light: #eff6ff;       /* Blue 50 */
+  --primary-subtle: #dbeafe;      /* Blue 100 */
+
+  --secondary-color: #6b7280;     /* Slate 500 neutro */
+  --secondary-hover: #4b5563;     /* Slate 600 neutro */
+  --secondary-light: #f8fafc;     /* Slate 50 */
+
+  /* Cores Semânticas */
+  --success-color: #10b981;       /* Emerald 500 */
+  --success-hover: #059669;       /* Emerald 600 */
+  --success-bg: #ecfdf5;          /* Emerald 50 */
+  
+  --warning-color: #f59e0b;       /* Amber 500 */
+  --warning-hover: #d97706;       /* Amber 600 */
+  --warning-bg: #fffbeb;          /* Amber 50 */
+  
+  --danger-color: #ef4444;        /* Red 500 */
+  --danger-hover: #dc2626;        /* Red 600 */
+  --danger-bg: #fef2f2;           /* Red 50 */
+
+  --info-color: #06b6d4;          /* Cyan 500 */
+  --info-hover: #0891b2;          /* Cyan 600 */
+  --info-bg: #ecfeff;             /* Cyan 50 */
+  --primary-dark: var(--primary-hover);
+  --bg-color: var(--bg-primary);
+  --text-color: var(--text-primary);
+
+  /* Superfícies e Fundos */
+  --bg-primary: #ffffff;          /* White */
+  --bg-secondary: #f9fafb;        /* Gray 50 */
+  --bg-tertiary: #f1f5f9;         /* Gray 100 mais clean */
+  --bg-card: #ffffff;
+  --bg-modal: #ffffff;
+  --bg-dropdown: #ffffff;
+
+  /* Texto e Conteúdo */
+  --text-primary: #1e293b;        /* Slate 800 - Softer than 900 */
+  --text-secondary: #6b7280;      /* Slate 500 neutro */
+  --text-muted: #9ca3af;          /* Slate 400 mais suave */
+  --text-inverted: #ffffff;
+
+  /* Bordas e Divisores */
+  --border-color: #e5e7eb;        /* Gray 200 mais neutro */
+  --border-hover: #d1d5db;        /* Gray 300 */
+  --border-light: #eef2ff;        /* Sutil toque de azul claro */
+
+  /* Sombras (Soft & Minimalist) */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.05), 0 4px 6px -2px rgba(0,0,0,0.02);
+  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.05), 0 10px 10px -5px rgba(0,0,0,0.02);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+}

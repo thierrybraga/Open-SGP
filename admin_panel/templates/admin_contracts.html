@@ -1,0 +1,292 @@
+{% extends 'base.html' %}
+
+{% block title %}Contratos - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+{% endblock %}
+
+{% block content %}
+<div class="container animate__animated animate__fadeInUp">
+
+  <!-- Breadcrumbs -->
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item">
+      <a href="/">Home</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">
+      <a href="/admin">Administração</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">Contratos</span>
+  </nav>
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Contratos</h1>
+      <p class="page-subtitle">Gerencie os contratos de serviço</p>
+    </div>
+    <div class="page-header-actions">
+      <button type="button" class="btn btn-primary" onclick="ISP_ERP.openModal('modal-contract')">
+        <span aria-hidden="true">➕</span>
+        Novo Contrato
+      </button>
+    </div>
+  </header>
+  
+  <div id="filter-container"></div>
+
+  <div class="card">
+    <div class="card-body">
+      <div id="table-container"></div>
+    </div>
+  </div>
+  <div id="pagination-container"></div>
+
+</div>
+
+<!-- Modal: Contract -->
+<div id="modal-contract" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Novo Contrato</h2>
+      <button class="modal-close" aria-label="Fechar modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-contract" method="post" action="{{ url_for('admin_contracts') }}" data-validate>
+        <input type="hidden" name="id" id="contract-id" />
+        
+        <div class="form-group">
+          <label for="client_id" class="form-label required">Cliente</label>
+          <select id="client_id" name="client_id" class="form-control" required>
+            <option value="">Selecione um cliente...</option>
+            {% for client in clients %}
+            <option value="{{ client.id }}">{{ client.name }} ({{ client.document }})</option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="plan_id" class="form-label required">Plano</label>
+            <select id="plan_id" name="plan_id" class="form-control" required>
+              <option value="">Selecione um plano...</option>
+              {% for plan in plans %}
+              <option value="{{ plan.id }}">{{ plan.name }} - R$ {{ plan.price }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="status" class="form-label required">Status</label>
+            <select id="status" name="status" class="form-control" required>
+              <option value="pending">Pendente</option>
+              <option value="active">Ativo</option>
+              <option value="suspended">Suspenso</option>
+              <option value="canceled">Cancelado</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="form-row">
+          <div class="form-group">
+            <label for="start_date" class="form-label required">Data Início</label>
+            <input type="date" id="start_date" name="start_date" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label for="billing_day" class="form-label required">Dia Vencimento</label>
+            <input type="number" id="billing_day" name="billing_day" class="form-control" min="1" max="31" value="10" required />
+          </div>
+        </div>
+        
+        <div class="form-group">
+          <label for="installation_address" class="form-label required">Endereço de Instalação</label>
+          <input type="text" id="installation_address" name="installation_address" class="form-control" required />
+        </div>
+        
+        <div class="form-group">
+          <label for="price_override" class="form-label">Preço Personalizado (R$)</label>
+          <input type="number" id="price_override" name="price_override" class="form-control" step="0.01" placeholder="Deixe em branco para usar preço do plano" />
+        </div>
+        
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="suspend_on_arrears" name="suspend_on_arrears" checked />
+            Bloqueio Automático em Atraso
+          </label>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+      <button type="submit" form="form-contract" class="btn btn-primary">Salvar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+<script>
+  const contractsData = [
+    {% for item in items %}
+    {
+      id: {{ item.id }},
+      client_name: '{{ item.client.name | replace("'", "\\'") }}',
+      plan_name: '{{ item.plan.name | replace("'", "\\'") }}',
+      client_id: {{ item.client_id }},
+      plan_id: {{ item.plan_id }},
+      status: '{{ item.status }}',
+      start_date: '{{ item.start_date }}',
+      billing_day: {{ item.billing_day }},
+      installation_address: '{{ item.installation_address | replace("'", "\\'") }}',
+      price_override: {{ item.price_override if item.price_override else 'null' }},
+      suspend_on_arrears: {{ "true" if item.suspend_on_arrears else "false" }}
+    }{% if not loop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  document.addEventListener('DOMContentLoaded', function() {
+    
+    const filterPanel = new ISP_Components.FilterPanel({
+      container: '#filter-container',
+      filters: [
+        { type: 'text', name: 'client', label: 'Cliente', placeholder: 'Nome do cliente' },
+        { 
+          type: 'select', 
+          name: 'status', 
+          label: 'Status', 
+          options: [
+            { value: 'active', label: 'Ativo' },
+            { value: 'pending', label: 'Pendente' },
+            { value: 'suspended', label: 'Suspenso' },
+            { value: 'canceled', label: 'Cancelado' }
+          ] 
+        }
+      ],
+      onApply: (filters) => {
+        const params = new URLSearchParams(window.location.search);
+        Object.keys(filters).forEach(key => {
+           if(filters[key]) params.set(key, filters[key]);
+           else params.delete(key);
+        });
+        window.location.search = params.toString();
+      },
+      onReset: () => {
+        window.location.href = window.location.pathname;
+      }
+    });
+
+    const dataTable = new ISP_Components.DataTable({
+      container: '#table-container',
+      columns: [
+        { field: 'id', label: 'ID', sortable: true }, 
+        { field: 'client_name', label: 'Cliente', sortable: true }, 
+        { field: 'plan_name', label: 'Plano', sortable: true },
+        { 
+          field: 'status', 
+          label: 'Status', 
+          render: (val) => {
+            const colors = { 'active': 'success', 'pending': 'warning', 'suspended': 'danger', 'canceled': 'secondary' };
+            const labels = { 'active': 'Ativo', 'pending': 'Pendente', 'suspended': 'Suspenso', 'canceled': 'Cancelado' };
+            return `<span class="badge badge-${colors[val] || 'secondary'}">${labels[val] || val}</span>`;
+          }
+        },
+        { field: 'start_date', label: 'Início', sortable: true },
+        { field: 'billing_day', label: 'Dia Venc.' }
+      ],
+      data: contractsData,
+      actions: [
+        { name: 'edit', label: 'Editar', icon: '✏️', handler: (row) => editContract(row) },
+        { name: 'delete', label: 'Excluir', icon: '🗑️', variant: 'danger', handler: (row) => deleteContract(row) }
+      ],
+      emptyMessage: 'Nenhum contrato encontrado'
+    });
+    
+    new ISP_Components.Pagination({
+      container: '#pagination-container',
+      total: contractsData.length,
+      currentPage: 1,
+      pageSize: 10
+    });
+    
+    const formValidator = new ISP_Components.FormValidator('#form-contract', {});
+    
+    window.editContract = (row) => {
+      document.getElementById('contract-id').value = row.id;
+      document.getElementById('client_id').value = row.client_id;
+      document.getElementById('plan_id').value = row.plan_id;
+      document.getElementById('status').value = row.status;
+      document.getElementById('start_date').value = row.start_date;
+      document.getElementById('billing_day').value = row.billing_day;
+      document.getElementById('installation_address').value = row.installation_address;
+      document.getElementById('price_override').value = row.price_override || '';
+      document.getElementById('suspend_on_arrears').checked = row.suspend_on_arrears;
+      
+      document.getElementById('modal-title').textContent = 'Editar Contrato';
+      ISP_ERP.openModal('modal-contract');
+    };
+
+    // Use standard ISP_ERP.openModal and closeModal functions
+    document.querySelectorAll('[data-modal-close]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ISP_ERP.closeModal('modal-contract');
+      });
+    });
+
+    // Reset form when opening for new contract
+    // Note: The onclick="ISP_ERP.openModal('modal-contract')" on the button handles opening.
+    // We need to listen for when it opens to reset, or just attach a separate listener to the button.
+    // However, since we used onclick in HTML, let's attach the reset logic to the button click as well,
+    // or better, intercept the click.
+    // But since I changed the button to use onclick, I should probably add an event listener here that matches the button.
+    // The previous code had `data-modal-target="modal-contract"`. I replaced it with `onclick`.
+    // Let's add an event listener to the "Novo Contrato" button specifically if possible, or just use the button class/text.
+    // Actually, I can just add an event listener to the button in the header.
+    const newContractBtn = document.querySelector('.page-header-actions .btn-primary');
+    if (newContractBtn) {
+        newContractBtn.addEventListener('click', () => {
+            document.getElementById('form-contract').reset();
+            document.getElementById('contract-id').value = '';
+            document.getElementById('start_date').value = new Date().toISOString().split('T')[0];
+            document.getElementById('modal-title').textContent = 'Novo Contrato';
+            // Modal opening is handled by onclick
+        });
+    }
+
+    window.deleteContract = (row) => {
+      ISP_ERP.confirm('Tem certeza que deseja excluir este contrato?', (confirmed) => {
+        if (confirmed) {
+          fetch(`/admin/contracts/${row.id}/delete`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+              if (data.success) {
+                if (window.UI && window.UI.toast) {
+                    UI.toast.success('Contrato excluído com sucesso!');
+                } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.success('Contrato excluído com sucesso!');
+                }
+                setTimeout(() => window.location.reload(), 1000);
+              } else {
+                if (window.UI && window.UI.toast) {
+                    UI.toast.error(data.error || 'Erro ao excluir contrato');
+                } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.error(data.error || 'Erro ao excluir contrato');
+                }
+              }
+            })
+            .catch(err => {
+              console.error(err);
+              if (window.UI && window.UI.toast) {
+                  UI.toast.error('Erro de conexão');
+              } else {
+                  alert('Erro de conexão');
+              }
+            });
+        }
+      });
+    };
+  });
+</script>
+{% endblock %}

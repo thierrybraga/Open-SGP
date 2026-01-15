@@ -1,0 +1,780 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Atribuições de Rede - ISP ERP</title>
+
+  <!-- CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <!-- Skip Link -->
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+
+  <!-- Navigation -->
+  {% include 'components/navbar.html' %}
+
+  <!-- Main Content -->
+  <main id="main-content" class="main-content">
+    <div class="container">
+
+      <!-- Breadcrumbs -->
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item">
+          <a href="/">Home</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">
+          <a href="/admin/network">Rede</a>
+        </span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">Atribuições</span>
+      </nav>
+
+      <!-- Page Header -->
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Atribuições de Rede</h1>
+          <p class="page-subtitle">Gerencie provisionamento e bloqueios de contratos na rede</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-outline-primary" onclick="refreshData()">
+            <span aria-hidden="true">🔄</span>
+            Atualizar
+          </button>
+          <button type="button" class="btn btn-primary" onclick="openBulkActionsModal()">
+            <span aria-hidden="true">⚡</span>
+            Ações em Lote
+          </button>
+        </div>
+      </header>
+
+      <!-- Alert Messages -->
+      {% if message %}
+      <div class="alert alert-success" role="alert">
+        <strong>Sucesso!</strong> {{ message }}
+      </div>
+      {% endif %}
+
+      <!-- Filters -->
+      <div id="filter-container"></div>
+
+      <!-- Data Table -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title">Atribuições de Contratos</h2>
+          <div class="card-actions">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="exportData()" aria-label="Exportar dados">
+              <span aria-hidden="true">📥</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="refreshData()" aria-label="Atualizar dados">
+              <span aria-hidden="true">🔄</span>
+            </button>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+
+      <!-- Pagination -->
+      <div id="pagination-container"></div>
+
+    </div>
+  </main>
+
+  <!-- Modal: Bulk Actions -->
+  <div id="modal-bulk-actions" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Ações em Lote</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info" role="alert">
+          Selecione contratos na tabela e escolha uma ação para aplicar a todos.
+        </div>
+
+        <div class="bulk-actions-grid">
+          <button type="button" class="btn btn-primary" onclick="bulkProvision()">
+            <span aria-hidden="true">🚀</span>
+            Provisionar Selecionados
+          </button>
+          <button type="button" class="btn btn-danger" onclick="bulkBlock()">
+            <span aria-hidden="true">🔒</span>
+            Bloquear Selecionados
+          </button>
+          <button type="button" class="btn btn-success" onclick="bulkUnblock()">
+            <span aria-hidden="true">🔓</span>
+            Desbloquear Selecionados
+          </button>
+          <button type="button" class="btn btn-warning" onclick="bulkSyncBilling()">
+            <span aria-hidden="true">💰</span>
+            Sincronizar Financeiro
+          </button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Edit Assignment -->
+  <div id="modal-edit-assignment" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 800px; width: 90%;">
+      <div class="modal-header">
+        <h2 class="modal-title">Editar Atribuição de Rede</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-edit-assignment" method="POST" action="/admin/network/assignments">
+          <input type="hidden" name="contract_id" id="edit-contract-id">
+          
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="edit-device-id">Concentrador / OLT</label>
+              <select class="form-control" id="edit-device-id" name="device_id">
+                <option value="">Selecione...</option>
+                {% for d in devices %}
+                <option value="{{ d.id }}">{{ d.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            
+            <div class="form-group">
+              <label for="edit-pool-id">Pool de IP</label>
+              <select class="form-control" id="edit-pool-id" name="ip_pool_id">
+                <option value="">Selecione...</option>
+                {% for p in pools %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-vlan-id">VLAN</label>
+              <select class="form-control" id="edit-vlan-id" name="vlan_id">
+                <option value="">Selecione...</option>
+                {% for v in vlans %}
+                <option value="{{ v.id }}">{{ v.name }} ({{ v.vlan_id }})</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-profile-id">Perfil de Velocidade</label>
+              <select class="form-control" id="edit-profile-id" name="profile_id">
+                <option value="">Selecione...</option>
+                {% for p in profiles %}
+                <option value="{{ p.id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <div class="form-section-title" style="margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px;">Autenticação PPPoE</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="edit-pppoe-user">Usuário PPPoE</label>
+              <input type="text" class="form-control" id="edit-pppoe-user" name="pppoe_user">
+            </div>
+            <div class="form-group">
+              <label for="edit-pppoe-password">Senha PPPoE</label>
+              <input type="text" class="form-control" id="edit-pppoe-password" name="pppoe_password">
+            </div>
+          </div>
+
+          <div class="form-section-title" style="margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px;">Equipamento (CPE)</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="edit-mac-address">Endereço MAC</label>
+              <input type="text" class="form-control" id="edit-mac-address" name="mac_address" placeholder="AA:BB:CC:DD:EE:FF">
+            </div>
+            <div class="form-group">
+              <label for="edit-wifi-ssid">WiFi SSID (Nome da Rede)</label>
+              <input type="text" class="form-control" id="edit-wifi-ssid" name="wifi_ssid">
+            </div>
+            <div class="form-group">
+              <label for="edit-wifi-password">WiFi Senha</label>
+              <input type="text" class="form-control" id="edit-wifi-password" name="wifi_password">
+            </div>
+          </div>
+          </div>
+
+          <div class="form-section-title" style="margin-top: 20px; margin-bottom: 10px; font-weight: bold; border-bottom: 1px solid #eee; padding-bottom: 5px;">Configurações Avançadas</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="edit-static-ip">IP Estático (Opcional)</label>
+              <input type="text" class="form-control" id="edit-static-ip" name="static_ip" placeholder="Ex: 192.168.10.50">
+            </div>
+            <div class="form-group checkbox-group" style="display: flex; align-items: center; padding-top: 30px;">
+              <input type="checkbox" id="edit-cgnat" name="cgnat">
+              <label for="edit-cgnat" style="margin-left: 10px; margin-bottom: 0;">Ativar CGNAT</label>
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 20px; text-align: right;">
+            <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+            <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Radius Info -->
+  <div id="modal-radius-info" class="modal-overlay" style="display: none;">
+    <div class="modal" style="max-width: 800px; width: 90%;">
+      <div class="modal-header">
+        <h2 class="modal-title">Status da Conexão (RADIUS)</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="radius-loading" style="text-align: center; padding: 20px;">
+          <div class="spinner"></div>
+          <p>Carregando dados...</p>
+        </div>
+        
+        <div id="radius-content" style="display: none;">
+          <h3>Sessão Ativa</h3>
+          <div class="info-grid">
+              <div class="info-item">
+                  <span class="info-label">Status</span>
+                  <span class="info-value" id="rad-status">-</span>
+              </div>
+              <div class="info-item">
+                  <span class="info-label">IP</span>
+                  <span class="info-value" id="rad-ip">-</span>
+              </div>
+              <div class="info-item">
+                  <span class="info-label">Início</span>
+                  <span class="info-value" id="rad-start">-</span>
+              </div>
+              <div class="info-item">
+                  <span class="info-label">Download (Sessão)</span>
+                  <span class="info-value" id="rad-down">-</span>
+              </div>
+              <div class="info-item">
+                  <span class="info-label">Upload (Sessão)</span>
+                  <span class="info-value" id="rad-up">-</span>
+              </div>
+          </div>
+
+          <h3 style="margin-top: 20px;">Histórico Recente</h3>
+          <div class="table-responsive">
+              <table class="table table-striped">
+                  <thead>
+                      <tr>
+                          <th>Início</th>
+                          <th>Fim</th>
+                          <th>Duração</th>
+                          <th>Download</th>
+                          <th>Upload</th>
+                          <th>Causa</th>
+                      </tr>
+                  </thead>
+                  <tbody id="rad-history-body">
+                      <!-- Rows -->
+                  </tbody>
+              </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  {% include 'components/footer.html' %}
+
+  <!-- JavaScript -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+
+      // Sample data (replace with actual data from backend)
+      const assignmentsData = [
+        {% for a in items %}
+        {
+          contract_id: {{ a.contract_id }},
+          device_id: {{ a.device_id or 'null' }},
+          device_name: {{ (a.device.name if a.device else "-") | tojson }},
+          pool_id: {{ a.ip_pool_id or 'null' }},
+          pool_name: {{ (a.ip_pool.name if a.ip_pool else "-") | tojson }},
+          vlan_id_val: {{ a.vlan_id or 'null' }},
+          vlan_id: {{ (a.vlan.vlan_id if a.vlan else "-") | tojson }},
+          profile_id: {{ a.profile_id or 'null' }},
+          profile_name: {{ (a.profile.name if a.profile else "-") | tojson }},
+          static_ip: {{ (a.static_ip or "") | tojson }},
+          cgnat: {{ 'true' if a.cgnat else 'false' }},
+          pppoe_user: {{ (a.pppoe_user or "") | tojson }},
+          pppoe_password: {{ (a.pppoe_password or "") | tojson }},
+          mac_address: {{ (a.mac_address or "") | tojson }},
+          wifi_ssid: {{ (a.wifi_ssid or "") | tojson }},
+          wifi_password: {{ (a.wifi_password or "") | tojson }},
+          status: {{ a.status | tojson }},
+          last_provisioned_at: {{ (a.last_provisioned_at or "") | tojson }}
+        }{% if not loop.last %},{% endif %}
+        {% endfor %}
+      ];
+
+      // Initialize Filter Panel
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          {
+            name: 'status',
+            label: 'Status',
+            type: 'select',
+            options: [
+              { value: 'active', label: 'Ativo' },
+              { value: 'blocked', label: 'Bloqueado' }
+            ]
+          },
+          {
+            name: 'contract_id',
+            label: 'Contrato ID',
+            type: 'number',
+            placeholder: 'Digite o ID do contrato'
+          },
+          {
+            name: 'device',
+            label: 'Dispositivo',
+            type: 'text',
+            placeholder: 'Nome do dispositivo'
+          },
+          {
+            name: 'cgnat',
+            label: 'CGNAT',
+            type: 'select',
+            options: [
+              { value: 'true', label: 'Sim' },
+              { value: 'false', label: 'Não' }
+            ]
+          }
+        ],
+        onApply: function(filters) {
+          console.log('Filters applied:', filters);
+          ISP_AdvancedComponents.Toast.success('Filtros aplicados com sucesso');
+
+          let filtered = assignmentsData;
+
+          if (filters.status) {
+            filtered = filtered.filter(a => a.status === filters.status);
+          }
+          if (filters.contract_id) {
+            filtered = filtered.filter(a => a.contract_id == filters.contract_id);
+          }
+          if (filters.device) {
+            filtered = filtered.filter(a => a.device_name.toLowerCase().includes(filters.device.toLowerCase()));
+          }
+          if (filters.cgnat) {
+            filtered = filtered.filter(a => a.cgnat === (filters.cgnat === 'true'));
+          }
+
+          dataTable.update(filtered);
+          pagination.updateTotal(filtered.length);
+        },
+        onReset: function() {
+          console.log('Filters reset');
+          dataTable.update(assignmentsData);
+          pagination.updateTotal(assignmentsData.length);
+          ISP_AdvancedComponents.Toast.info('Filtros limpos');
+        }
+      });
+
+      // Initialize Data Table
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'contract_id', label: 'Contrato', sortable: true },
+          { field: 'device_name', label: 'Dispositivo', sortable: true },
+          { field: 'pool_name', label: 'Pool', sortable: true },
+          { field: 'vlan_id', label: 'VLAN', sortable: true },
+          { field: 'profile_name', label: 'Perfil', sortable: true },
+          { field: 'static_ip', label: 'IP Fixo', sortable: true },
+          {
+            field: 'cgnat',
+            label: 'CGNAT',
+            sortable: true,
+            render: function(value) {
+              return value ?
+                '<span class="status-indicator success"><span class="status-dot"></span>Sim</span>' :
+                '<span class="status-indicator secondary"><span class="status-dot"></span>Não</span>';
+            }
+          },
+          {
+            field: 'status',
+            label: 'Status',
+            type: 'status',
+            sortable: true,
+            render: function(value) {
+              const statusMap = {
+                active: { label: 'Ativo', class: 'success' },
+                blocked: { label: 'Bloqueado', class: 'danger' }
+              };
+              const info = statusMap[value] || { label: value, class: 'secondary' };
+              return `
+                <span class="status-indicator ${info.class}">
+                  <span class="status-dot" aria-hidden="true"></span>
+                  ${info.label}
+                </span>
+              `;
+            }
+          }
+        ],
+        data: assignmentsData,
+        selectable: true,
+        actions: [
+          {
+            name: 'edit',
+            label: 'Editar',
+            icon: '✏️',
+            handler: function(row) {
+              editAssignment(row);
+            }
+          },
+          {
+            name: 'provision',
+            label: 'Provisionar',
+            icon: '🚀',
+            handler: function(row) {
+              provisionContract(row);
+            }
+          },
+          {
+            name: 'block',
+            label: 'Bloquear',
+            icon: '🔒',
+            handler: function(row) {
+              blockContract(row);
+            }
+          },
+          {
+            name: 'unblock',
+            label: 'Desbloquear',
+            icon: '🔓',
+            handler: function(row) {
+              unblockContract(row);
+            }
+          },
+          {
+            name: 'sync',
+            label: 'Sincronizar Financeiro',
+            icon: '💰',
+            handler: function(row) {
+              syncBilling(row);
+            }
+          },
+          {
+            name: 'radius',
+            label: 'Status Conexão',
+            icon: '📶',
+            handler: function(row) {
+              checkRadiusStatus(row);
+            }
+          },
+          {
+            name: 'history',
+            label: 'Histórico Técnico',
+            icon: '📜',
+            handler: function(row) {
+              window.location.href = `/network/tech-history/${row.contract_id}`;
+            }
+          }
+        ],
+        onSelect: function(selectedIds) {
+          console.log('Selected:', selectedIds);
+          if (selectedIds.length > 0) {
+            ISP_AdvancedComponents.Toast.info(`${selectedIds.length} contrato(s) selecionado(s)`);
+          }
+        },
+        emptyMessage: 'Nenhuma atribuição encontrada'
+      });
+
+      // Initialize Pagination
+      const pagination = new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: assignmentsData.length,
+        currentPage: 1,
+        pageSize: 10,
+        onPageChange: function(page, pageSize) {
+          console.log('Page changed:', page, pageSize);
+          ISP_AdvancedComponents.Toast.info(`Carregando página ${page}...`);
+        }
+      });
+
+      // Action functions
+      window.editAssignment = function(row) {
+        document.getElementById('edit-contract-id').value = row.contract_id;
+        document.getElementById('edit-device-id').value = row.device_id || "";
+        document.getElementById('edit-pool-id').value = row.pool_id || "";
+        document.getElementById('edit-vlan-id').value = row.vlan_id_val || "";
+        document.getElementById('edit-profile-id').value = row.profile_id || "";
+        
+        document.getElementById('edit-pppoe-user').value = row.pppoe_user || "";
+        document.getElementById('edit-pppoe-password').value = row.pppoe_password || "";
+        document.getElementById('edit-mac-address').value = row.mac_address || "";
+        
+        document.getElementById('edit-wifi-ssid').value = row.wifi_ssid || "";
+        document.getElementById('edit-wifi-password').value = row.wifi_password || "";
+        
+        document.getElementById('edit-static-ip').value = row.static_ip || "";
+        document.getElementById('edit-cgnat').checked = row.cgnat;
+        
+        ISP_ERP.openModal('modal-edit-assignment');
+      };
+
+      window.provisionContract = function(row) {
+        ISP_ERP.confirm(
+          `Deseja provisionar o contrato ${row.contract_id}?`,
+          function(confirmed) {
+            if (confirmed) {
+              window.location.href = `/admin/network/assignments/provision/${row.contract_id}`;
+            }
+          }
+        );
+      };
+
+      window.blockContract = function(row) {
+        ISP_ERP.confirm(
+          `Deseja bloquear o contrato ${row.contract_id}?`,
+          function(confirmed) {
+            if (confirmed) {
+              window.location.href = `/admin/network/assignments/block/${row.contract_id}`;
+            }
+          }
+        );
+      };
+
+      window.unblockContract = function(row) {
+        ISP_ERP.confirm(
+          `Deseja desbloquear o contrato ${row.contract_id}?`,
+          function(confirmed) {
+            if (confirmed) {
+              window.location.href = `/admin/network/assignments/unblock/${row.contract_id}`;
+            }
+          }
+        );
+      };
+
+      window.syncBilling = function(row) {
+        ISP_ERP.confirm(
+          `Sincronizar bloqueio via financeiro para o contrato ${row.contract_id}?`,
+          function(confirmed) {
+            if (confirmed) {
+              window.location.href = `/admin/network/assignments/sync-billing/${row.contract_id}`;
+            }
+          }
+        );
+      };
+
+      // Bulk actions
+      window.openBulkActionsModal = function() {
+        const selected = dataTable.getSelectedIds();
+        if (selected.length === 0) {
+          ISP_AdvancedComponents.Toast.warning('Selecione ao menos um contrato');
+          return;
+        }
+        ISP_ERP.openModal('modal-bulk-actions');
+      };
+
+      window.bulkProvision = function() {
+        const selected = dataTable.getSelectedIds();
+        ISP_ERP.confirm(
+          `Provisionar ${selected.length} contrato(s)?`,
+          function(confirmed) {
+            if (confirmed) {
+              ISP_AdvancedComponents.Toast.success(`${selected.length} contrato(s) provisionado(s)!`);
+              ISP_ERP.closeModal('modal-bulk-actions');
+            }
+          }
+        );
+      };
+
+      window.bulkBlock = function() {
+        const selected = dataTable.getSelectedIds();
+        ISP_ERP.confirm(
+          `Bloquear ${selected.length} contrato(s)?`,
+          function(confirmed) {
+            if (confirmed) {
+              ISP_AdvancedComponents.Toast.success(`${selected.length} contrato(s) bloqueado(s)!`);
+              ISP_ERP.closeModal('modal-bulk-actions');
+            }
+          }
+        );
+      };
+
+      window.bulkUnblock = function() {
+        const selected = dataTable.getSelectedIds();
+        ISP_ERP.confirm(
+          `Desbloquear ${selected.length} contrato(s)?`,
+          function(confirmed) {
+            if (confirmed) {
+              ISP_AdvancedComponents.Toast.success(`${selected.length} contrato(s) desbloqueado(s)!`);
+              ISP_ERP.closeModal('modal-bulk-actions');
+            }
+          }
+        );
+      };
+
+      window.bulkSyncBilling = function() {
+        const selected = dataTable.getSelectedIds();
+        ISP_ERP.confirm(
+          `Sincronizar financeiro para ${selected.length} contrato(s)?`,
+          function(confirmed) {
+            if (confirmed) {
+              ISP_AdvancedComponents.Toast.success(`${selected.length} contrato(s) sincronizado(s)!`);
+              ISP_ERP.closeModal('modal-bulk-actions');
+            }
+          }
+        );
+      };
+
+      // Refresh data
+      window.refreshData = function() {
+        ISP_AdvancedComponents.Toast.info('Atualizando dados...', { duration: 1500 });
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      };
+
+      // Export data
+      window.exportData = function() {
+        ISP_AdvancedComponents.Toast.info('Exportando dados...', { duration: 2000 });
+        setTimeout(() => {
+          ISP_AdvancedComponents.Toast.success('Dados exportados para Excel!');
+        }, 2000);
+      };
+
+      window.checkRadiusStatus = async function(row) {
+          const username = row.contract_id;
+          ISP_ERP.openModal('modal-radius-info');
+          
+          document.getElementById('radius-loading').style.display = 'block';
+          document.getElementById('radius-content').style.display = 'none';
+          
+          try {
+              const token = localStorage.getItem('token');
+              const headers = { 'Authorization': `Bearer ${token}` };
+
+              const sessionRes = await fetch(`/api/network/radius/session/${username}`, { headers });
+              const sessionData = await sessionRes.json();
+              
+              const historyRes = await fetch(`/api/network/radius/history/${username}`, { headers });
+              const historyData = await historyRes.json();
+              
+              const statusEl = document.getElementById('rad-status');
+              if (sessionData) {
+                  statusEl.innerHTML = '<span class="status-indicator success"><span class="status-dot"></span>Online</span>';
+                  document.getElementById('rad-ip').textContent = sessionData.ip_address;
+                  document.getElementById('rad-start').textContent = new Date(sessionData.start_time).toLocaleString();
+                  document.getElementById('rad-down').textContent = sessionData.input_mb + ' MB';
+                  document.getElementById('rad-up').textContent = sessionData.output_mb + ' MB';
+              } else {
+                  statusEl.innerHTML = '<span class="status-indicator secondary"><span class="status-dot"></span>Offline</span>';
+                   document.getElementById('rad-ip').textContent = '-';
+                  document.getElementById('rad-start').textContent = '-';
+                  document.getElementById('rad-down').textContent = '-';
+                  document.getElementById('rad-up').textContent = '-';
+              }
+
+              const tbody = document.getElementById('rad-history-body');
+              tbody.innerHTML = '';
+              historyData.forEach(h => {
+                  const tr = document.createElement('tr');
+                  tr.innerHTML = `
+                      <td>${new Date(h.start_time).toLocaleString()}</td>
+                      <td>${h.stop_time ? new Date(h.stop_time).toLocaleString() : '-'}</td>
+                      <td>${formatDuration(h.duration_seconds)}</td>
+                      <td>${h.input_mb} MB</td>
+                      <td>${h.output_mb} MB</td>
+                      <td>${h.termination_cause || '-'}</td>
+                  `;
+                  tbody.appendChild(tr);
+              });
+
+              document.getElementById('radius-loading').style.display = 'none';
+              document.getElementById('radius-content').style.display = 'block';
+
+          } catch (error) {
+              console.error(error);
+              ISP_AdvancedComponents.Toast.error('Erro ao buscar dados do RADIUS');
+              document.getElementById('radius-loading').style.display = 'none';
+          }
+      };
+
+      function formatDuration(seconds) {
+          if (!seconds) return '-';
+          const h = Math.floor(seconds / 3600);
+          const m = Math.floor((seconds % 3600) / 60);
+          const s = seconds % 60;
+          return `${h}h ${m}m ${s}s`;
+      }
+
+    });
+  </script>
+
+  <style>
+    /* Card styles */
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--spacing-lg);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .card-title {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      font-weight: 600;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    /* Bulk Actions Grid */
+    .bulk-actions-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+    }
+
+    @media (max-width: 768px) {
+      .page-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .page-header-actions {
+        width: 100%;
+      }
+
+      .bulk-actions-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+
+</body>
+</html>

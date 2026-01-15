@@ -1,0 +1,554 @@
+{% extends 'base.html' %}
+
+{% block title %}Consulta de Título - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+{% endblock %}
+
+{% block content %}
+<div class="container animate__animated animate__fadeInUp">
+
+  <!-- Breadcrumbs -->
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item">
+      <a href="/">Home</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">
+      <a href="/admin/finance">Financeiro</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">Consulta de Título</span>
+  </nav>
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Consulta de Título</h1>
+      <p class="page-subtitle">Busque e gerencie títulos financeiros</p>
+    </div>
+  </header>
+
+  <!-- Search Form -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Buscar Título</h2>
+    </div>
+    <div class="card-body">
+      <form method="get" id="search-form" data-validate>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="title-id" class="form-label">ID do Título</label>
+            <input type="number" id="title-id" name="title_id" class="form-control" placeholder="Digite o ID do título" value="{{ request.args.get('title_id', '') }}" />
+          </div>
+
+          <div class="form-group">
+            <label for="document-number" class="form-label">Número do Documento</label>
+            <input type="text" id="document-number" name="document_number" class="form-control" placeholder="Ex: 001/2024" value="{{ request.args.get('document_number', '') }}" />
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">
+            <span aria-hidden="true">🔍</span>
+            Buscar
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="clearSearch()">
+            Limpar
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Alerts -->
+  {% if error %}
+  <div class="alert alert-danger" role="alert">
+    <strong>Erro!</strong> {{ error }}
+  </div>
+  {% endif %}
+
+  {% if message %}
+  <div class="alert alert-success" role="alert">
+    <strong>Sucesso!</strong> {{ message }}
+  </div>
+  {% endif %}
+
+  <!-- Title Details -->
+  {% if title %}
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Detalhes do Título #{{ title.id }}</h2>
+      <div class="card-actions">
+        <button type="button" class="btn btn-sm btn-secondary" onclick="printTitle()">
+          <span aria-hidden="true">🖨️</span>
+          Imprimir
+        </button>
+      </div>
+    </div>
+    <div class="card-body">
+      <!-- Tabs Container -->
+      <div id="tabs-container"></div>
+    </div>
+  </div>
+
+  <!-- Actions Section -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Ações</h2>
+    </div>
+    <div class="card-body">
+      <div class="actions-grid">
+        <button type="button" class="btn btn-primary" onclick="openGenerateBoletoModal()">
+          <span aria-hidden="true">📄</span>
+          Gerar Boleto
+        </button>
+        <button type="button" class="btn btn-success" onclick="openRegisterPaymentModal()">
+          <span aria-hidden="true">💰</span>
+          Registrar Pagamento
+        </button>
+        <button type="button" class="btn btn-warning" onclick="openAdjustmentModal()">
+          <span aria-hidden="true">⚙️</span>
+          Adicionar Ajuste
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Adjustments Table -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Ajustes</h2>
+    </div>
+    <div class="card-body">
+      <div id="adjustments-table-container"></div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- Modal: Generate Boleto -->
+<div id="modal-generate-boleto" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Gerar Boleto</h2>
+      <button class="modal-close" aria-label="Fechar modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-generate-boleto" method="post">
+        <input type="hidden" name="title_id" value="{{ title.id if title else '' }}" />
+        <input type="hidden" name="document_number" value="{{ title.document_number if title else '' }}" />
+        <input type="hidden" name="action" value="generate_boleto" />
+
+        <div class="alert alert-info" role="alert">
+          Confirme a geração do boleto para o título <strong>{{ title.document_number if title else '' }}</strong>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Valor do Título:</label>
+          <div class="form-value">R$ {{ '%.2f'|format(title.amount) if title else '0.00' }}</div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Data de Vencimento:</label>
+          <div class="form-value">{{ title.due_date if title else '-' }}</div>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+      <button type="submit" form="form-generate-boleto" class="btn btn-primary">
+        <span aria-hidden="true">📄</span>
+        Gerar Boleto
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Register Payment -->
+<div id="modal-register-payment" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Registrar Pagamento</h2>
+      <button class="modal-close" aria-label="Fechar modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-register-payment" method="post" data-validate>
+        <input type="hidden" name="title_id" value="{{ title.id if title else '' }}" />
+        <input type="hidden" name="document_number" value="{{ title.document_number if title else '' }}" />
+        <input type="hidden" name="action" value="register_payment" />
+
+        <div class="form-group">
+          <label for="payment-amount" class="form-label required">Valor Pago</label>
+          <input type="number" id="payment-amount" name="amount" class="form-control" step="0.01" placeholder="0.00" required aria-required="true" />
+          <small class="form-help">Valor efetivo pago pelo cliente</small>
+        </div>
+
+        <div class="form-group">
+          <label for="payment-method" class="form-label required">Método de Pagamento</label>
+          <select id="payment-method" name="method" class="form-select" required aria-required="true">
+            <option value="">Selecione...</option>
+            <option value="boleto">Boleto Bancário</option>
+            <option value="pix">PIX</option>
+            <option value="cash">Dinheiro</option>
+            <option value="credit_card">Cartão de Crédito</option>
+            <option value="debit_card">Cartão de Débito</option>
+            <option value="bank_transfer">Transferência Bancária</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="payment-date" class="form-label">Data do Pagamento</label>
+          <input type="date" id="payment-date" name="payment_date" class="form-control" />
+          <small class="form-help">Deixe em branco para usar a data atual</small>
+        </div>
+
+        <div class="form-group">
+          <label for="payment-notes" class="form-label">Observações</label>
+          <textarea id="payment-notes" name="notes" class="form-control" rows="3" placeholder="Informações adicionais sobre o pagamento..."></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+      <button type="submit" form="form-register-payment" class="btn btn-success">
+        <span aria-hidden="true">💰</span>
+        Registrar Pagamento
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Adjustment -->
+<div id="modal-adjustment" class="modal-overlay" style="display: none;">
+  <div class="modal">
+    <div class="modal-header">
+      <h2 class="modal-title">Adicionar Ajuste</h2>
+      <button class="modal-close" aria-label="Fechar modal">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-adjustment" method="post" data-validate>
+        <input type="hidden" name="title_id" value="{{ title.id if title else '' }}" />
+        <input type="hidden" name="action" value="add_adjustment" />
+
+        <div class="form-group">
+          <label for="adjustment-type" class="form-label required">Tipo de Ajuste</label>
+          <select id="adjustment-type" name="type" class="form-select" required aria-required="true">
+            <option value="">Selecione...</option>
+            <option value="discount">Desconto</option>
+            <option value="interest">Juros</option>
+            <option value="fine">Multa</option>
+            <option value="fee">Taxa</option>
+            <option value="credit">Crédito</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="adjustment-amount" class="form-label required">Valor</label>
+          <input type="number" id="adjustment-amount" name="amount" class="form-control" step="0.01" placeholder="0.00" required aria-required="true" />
+        </div>
+
+        <div class="form-group">
+          <label for="adjustment-reason" class="form-label required">Motivo</label>
+          <textarea id="adjustment-reason" name="reason" class="form-control" rows="3" placeholder="Descreva o motivo do ajuste..." required aria-required="true"></textarea>
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+      <button type="submit" form="form-adjustment" class="btn btn-warning">
+        <span aria-hidden="true">⚙️</span>
+        Adicionar Ajuste
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+<script>
+  function clearSearch() {
+    window.location.href = window.location.pathname;
+  }
+
+  // Modals
+  function openGenerateBoletoModal() {
+    ISP_ERP.openModal('modal-generate-boleto');
+  }
+
+  function openRegisterPaymentModal() {
+    ISP_ERP.openModal('modal-register-payment');
+  }
+
+  function openAdjustmentModal() {
+    ISP_ERP.openModal('modal-adjustment');
+  }
+
+  function printTitle() {
+    window.print();
+  }
+
+  {% if title %}
+  document.addEventListener('DOMContentLoaded', function() {
+
+    // Title data
+    const titleData = {
+      id: {{ title.id }},
+      contract_id: {{ title.contract_id }},
+      document_number: '{{ title.document_number }}',
+      our_number: '{{ title.our_number }}',
+      due_date: '{{ title.due_date }}',
+      status: '{{ title.status }}',
+      amount: {{ title.amount }},
+      effective_amount: {{ effective_amount if effective_amount else title.amount }},
+      payment_slip_url: '{{ title.payment_slip_url or "" }}'
+    };
+
+    // Initialize Tabs
+    const tabs = new ISP_AdvancedComponents.Tabs({
+      container: '#tabs-container',
+      variant: 'underline',
+      tabs: [
+        {
+          label: 'Informações Gerais',
+          icon: '📄',
+          content: `
+            <div class="details-grid">
+              <div class="detail-item">
+                <label class="detail-label">ID do Título:</label>
+                <div class="detail-value">${titleData.id}</div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Contrato:</label>
+                <div class="detail-value">${titleData.contract_id}</div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Documento:</label>
+                <div class="detail-value">${titleData.document_number}</div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Nosso Número:</label>
+                <div class="detail-value">${titleData.our_number}</div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Status:</label>
+                <div class="detail-value">
+                  <span class="status-indicator ${getStatusClass(titleData.status)}">
+                    <span class="status-dot"></span>
+                    ${getStatusLabel(titleData.status)}
+                  </span>
+                </div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Vencimento:</label>
+                <div class="detail-value">${ISP_ERP.formatDate(new Date(titleData.due_date))}</div>
+              </div>
+            </div>
+          `
+        },
+        {
+          label: 'Valores',
+          icon: '💰',
+          content: `
+            <div class="details-grid">
+              <div class="detail-item">
+                <label class="detail-label">Valor Base:</label>
+                <div class="detail-value"><strong>${ISP_ERP.formatCurrency(titleData.amount)}</strong></div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Valor Efetivo:</label>
+                <div class="detail-value"><strong class="text-primary">${ISP_ERP.formatCurrency(titleData.effective_amount)}</strong></div>
+              </div>
+              <div class="detail-item">
+                <label class="detail-label">Diferença:</label>
+                <div class="detail-value ${titleData.effective_amount > titleData.amount ? 'text-danger' : 'text-success'}">
+                  ${ISP_ERP.formatCurrency(Math.abs(titleData.effective_amount - titleData.amount))}
+                </div>
+              </div>
+            </div>
+          `
+        },
+        {
+          label: 'Boleto',
+          icon: '📑',
+          content: `
+            <div class="details-grid">
+              <div class="detail-item">
+                <label class="detail-label">URL do Boleto:</label>
+                <div class="detail-value">
+                  ${titleData.payment_slip_url
+                    ? `<a href="${titleData.payment_slip_url}" target="_blank" class="btn btn-sm btn-link">Abrir Boleto</a>`
+                    : '<span class="text-muted">Nenhum boleto gerado</span>'
+                  }
+                </div>
+              </div>
+            </div>
+          `
+        }
+      ]
+    });
+
+    // Helper functions for status
+    function getStatusClass(status) {
+        const map = {
+            'pending': 'warning',
+            'paid': 'success',
+            'overdue': 'danger',
+            'canceled': 'secondary'
+        };
+        return map[status] || 'primary';
+    }
+
+    function getStatusLabel(status) {
+        const map = {
+            'pending': 'Pendente',
+            'paid': 'Pago',
+            'overdue': 'Vencido',
+            'canceled': 'Cancelado'
+        };
+        return map[status] || status;
+    }
+
+    // Adjustments data
+    const adjustmentsData = [
+      {% for a in adjustments %}
+      {
+        id: {{ a.id }},
+        type: '{{ a.type }}',
+        amount: {{ a.amount }},
+        reason: '{{ a.reason or "-" }}',
+        created_at: '{{ a.created_at }}'
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    // Initialize Adjustments Table
+    const adjustmentsTable = new ISP_Components.DataTable({
+      container: '#adjustments-table-container',
+      columns: [
+        { field: 'id', label: 'ID', sortable: true },
+        {
+          field: 'type',
+          label: 'Tipo',
+          sortable: true,
+          render: function(value) {
+            const typeMap = {
+              discount: { label: 'Desconto', class: 'success' },
+              interest: { label: 'Juros', class: 'warning' },
+              fine: { label: 'Multa', class: 'danger' },
+              fee: { label: 'Taxa', class: 'primary' },
+              credit: { label: 'Crédito', class: 'info' }
+            };
+            const info = typeMap[value] || { label: value, class: 'secondary' };
+            return `
+              <span class="status-indicator ${info.class}">
+                <span class="status-dot"></span>
+                ${info.label}
+              </span>
+            `;
+          }
+        },
+        {
+          field: 'amount',
+          label: 'Valor',
+          type: 'currency',
+          sortable: true
+        },
+        { field: 'reason', label: 'Motivo', sortable: false },
+        {
+          field: 'created_at',
+          label: 'Criado em',
+          type: 'datetime',
+          sortable: true
+        }
+      ],
+      data: adjustmentsData,
+      selectable: false,
+      emptyMessage: 'Nenhum ajuste registrado'
+    });
+
+    // Form validators
+    const paymentValidator = new ISP_Components.FormValidator('#form-register-payment', {
+      amount: {
+        required: true,
+        number: true,
+        min: 0.01,
+        messages: {
+          required: 'Valor é obrigatório',
+          number: 'Digite um valor válido',
+          min: 'Valor deve ser maior que zero'
+        }
+      },
+      method: {
+        required: true,
+        messages: {
+          required: 'Selecione um método de pagamento'
+        }
+      }
+    });
+
+    const adjustmentValidator = new ISP_Components.FormValidator('#form-adjustment', {
+      type: {
+        required: true,
+        messages: {
+          required: 'Selecione um tipo de ajuste'
+        }
+      },
+      amount: {
+        required: true,
+        number: true,
+        min: 0.01,
+        messages: {
+          required: 'Valor é obrigatório',
+          number: 'Digite um valor válido',
+          min: 'Valor deve ser maior que zero'
+        }
+      },
+      reason: {
+        required: true,
+        minLength: 10,
+        messages: {
+          required: 'Motivo é obrigatório',
+          minLength: 'Descreva o motivo com pelo menos 10 caracteres'
+        }
+      }
+    });
+
+    // Form submissions
+    document.getElementById('form-generate-boleto').addEventListener('submit', function(e) {
+      e.preventDefault();
+      ISP_ERP.confirm('Confirma a geração do boleto?', function(confirmed) {
+        if (confirmed) {
+          e.target.submit();
+        }
+      });
+    });
+
+    document.getElementById('form-register-payment').addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (paymentValidator.validate()) {
+        ISP_ERP.confirm('Confirma o registro do pagamento?', function(confirmed) {
+          if (confirmed) {
+            e.target.submit();
+          }
+        });
+      }
+    });
+
+    document.getElementById('form-adjustment').addEventListener('submit', function(e) {
+      e.preventDefault();
+      if (adjustmentValidator.validate()) {
+        ISP_ERP.confirm('Confirma o registro do ajuste?', function(confirmed) {
+          if (confirmed) {
+             e.target.submit();
+          }
+        });
+      }
+    });
+  });
+  {% endif %}
+</script>
+{% endblock %}

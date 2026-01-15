@@ -1,0 +1,45 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Faturas - Portal do Cliente{% endblock %}
+
+{% block content %}
+<div class="portal-card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <h2>Minhas Faturas</h2>
+        <a href="/portal/dashboard" class="btn btn-sm btn-secondary">Voltar</a>
+    </div>
+
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Vencimento</th>
+                <th>Valor</th>
+                <th>Status</th>
+                <th>Ações</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for title in titles %}
+            <tr>
+                <td>{{ title.due_date }}</td>
+                <td>R$ {{ "%.2f"|format(title.amount) }}</td>
+                <td>
+                    <span class="status-badge {{ 'status-success' if title.status == 'paid' else 'status-danger' if title.status == 'overdue' else 'status-warning' }}">
+                        {{ title.status }}
+                    </span>
+                </td>
+                <td>
+                    {% if title.status != 'paid' %}
+                    <button class="btn btn-sm btn-primary" onclick="alert('Código de barras copiado!')">Copiar Código</button>
+                    {% else %}
+                    <span class="text-muted">Pago</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4">Nenhuma fatura encontrada.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

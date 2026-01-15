@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ordens de Serviço - ISP ERP</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
+  
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+</head>
+<body>
+  <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
+  {% include 'components/navbar.html' %}
+
+  <main id="main-content" class="main-content">
+    <div class="container">
+      <nav aria-label="Breadcrumb" class="breadcrumb">
+        <span class="breadcrumb-item"><a href="/">Home</a></span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item"><a href="/service">Serviços</a></span><span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item">Ordens de Serviço</span>
+      </nav>
+
+      <header class="page-header">
+        <div class="page-header-content">
+          <h1 class="page-title">Ordens de Serviço</h1>
+          <p class="page-subtitle">Gerencie as ordens de serviço técnicas</p>
+        </div>
+        <div class="page-header-actions">
+          <button type="button" class="btn btn-primary" data-modal-target="modal-order">
+            <span aria-hidden="true">➕</span>
+            Novo Ordem
+          </button>
+        </div>
+      </header>
+
+      <div id="filter-container"></div>
+
+      <div class="card">
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
+      </div>
+      <div id="pagination-container"></div>
+    </div>
+  </main>
+
+  <div id="modal-order" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Novo Ordem</h2>
+        <button class="modal-close" aria-label="Fechar modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-order" method="POST" action="{{ url_for('service_orders') }}" data-validate>
+          <input type="hidden" name="id" id="order-id" />
+          
+          <div class="form-group">
+            <label for="contract_id" class="form-label required">Contract Id</label>
+            <input type="number" id="contract_id" name="contract_id" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label for="technician" class="form-label">Technician</label>
+            <input type="text" id="technician" name="technician" class="form-control" />
+          </div>
+          <div class="form-group">
+            <label for="type" class="form-label required">Type</label>
+            <select id="type" name="type" class="form-control" required>
+                <option value="install">Instalação</option>
+                <option value="repair">Reparo</option>
+                <option value="relocation">Mudança de Endereço</option>
+                <option value="cancel">Cancelamento</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="description" class="form-label required">Description</label>
+            <input type="text" id="description" name="description" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label for="scheduled_date" class="form-label">Scheduled Date</label>
+            <input type="datetime-local" id="scheduled_date" name="scheduled_date" class="form-control" />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" form="form-order" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  {% include 'components/footer.html' %}
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/footer.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
+
+  <script>
+    const sampleData = {{ items|tojson|safe if items else '[]' }};
+    document.addEventListener('DOMContentLoaded', function() {
+      
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          { type: 'select', name: 'status', label: 'Status', options: [
+            { value: 'open', label: 'Aberto' },
+            { value: 'in_progress', label: 'Em Andamento' },
+            { value: 'completed', label: 'Concluído' },
+            { value: 'cancelled', label: 'Cancelado' }
+          ]},
+          { type: 'text', name: 'technician', label: 'Técnico', placeholder: 'Nome do técnico' }
+        ],
+        onApply: (filters) => {
+          const params = new URLSearchParams(window.location.search);
+          Object.keys(filters).forEach(key => {
+             if(filters[key]) params.set(key, filters[key]);
+             else params.delete(key);
+          });
+          window.location.search = params.toString();
+        },
+        onReset: () => {
+          window.location.href = window.location.pathname;
+        }
+      });
+
+      const dataTable = new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'Id', sortable: true }, 
+          { field: 'contract_id', label: 'Contract Id', sortable: true }, 
+          { field: 'technician_name', label: 'Technician', sortable: true }, 
+          { field: 'type', label: 'Type', sortable: true }, 
+          { field: 'status', label: 'Status', sortable: true }, 
+          { field: 'scheduled_at', label: 'Scheduled Date', sortable: true }
+        ],
+        data: sampleData,
+        actions: [
+          { name: 'edit', label: 'Editar', icon: '✏️', handler: (row) => editOrder(row) },
+          { name: 'delete', label: 'Excluir', icon: '🗑️', variant: 'danger', handler: (row) => deleteOrder(row) }
+        ],
+        emptyMessage: 'Nenhum registro encontrado'
+      });
+      
+      new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: sampleData.length,
+        currentPage: 1,
+        pageSize: 10
+      });
+      
+      const formValidator = new ISP_Components.FormValidator('#form-order', {});
+      
+      window.editOrder = (row) => {
+        document.getElementById('order-id').value = row.id;
+        document.getElementById('contract_id').value = row.contract_id;
+        document.getElementById('technician').value = row.technician_name || '';
+        document.getElementById('type').value = row.type;
+        document.getElementById('description').value = row.notes || '';
+        
+        if (row.scheduled_at) {
+             // Try to format for datetime-local input (YYYY-MM-DDTHH:MM)
+             try {
+                 const d = new Date(row.scheduled_at);
+                 const iso = d.toISOString().slice(0, 16);
+                 document.getElementById('scheduled_date').value = iso;
+             } catch(e) {
+                 console.log("Date parse error", e);
+             }
+        } else {
+            document.getElementById('scheduled_date').value = '';
+        }
+
+        document.getElementById('modal-title').textContent = 'Editar Ordem';
+        ISP_ERP.openModal('modal-order');
+      };
+
+      // Reset modal on close
+      document.querySelectorAll('[data-modal-close]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.getElementById('form-order').reset();
+            document.getElementById('order-id').value = '';
+            document.getElementById('modal-title').textContent = 'Novo Ordem';
+        });
+      });
+
+      window.deleteOrder = (row) => {
+        ISP_ERP.confirm('Excluir este registro?', (c) => { if(c) location.reload(); });
+      };
+    });
+  </script>
+</body>
+</html>

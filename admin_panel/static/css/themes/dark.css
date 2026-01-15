@@ -1,0 +1,63 @@
+/**
+ * dark.css - Tema Escuro
+ * Sistema de Design ISP ERP
+ */
+
+[data-theme="dark"] {
+  /* Paleta de Cores Principal (Dark Mode) */
+  --primary-color: #3b82f6;       /* Blue 500 */
+  --primary-hover: #60a5fa;       /* Blue 400 */
+  --primary-active: #2563eb;      /* Blue 600 */
+  --primary-light: #1e3a8a;       /* Blue 900 */
+  --primary-subtle: #172554;      /* Blue 950 */
+
+  --secondary-color: #94a3b8;     /* Slate 400 */
+  --secondary-hover: #cbd5e1;     /* Slate 300 */
+  --secondary-light: #1e293b;     /* Slate 800 */
+
+  /* Cores Semânticas */
+  --success-color: #34d399;       /* Emerald 400 */
+  --success-hover: #6ee7b7;       /* Emerald 300 */
+  --success-bg: #064e3b;          /* Emerald 900 */
+  
+  --warning-color: #fbbf24;       /* Amber 400 */
+  --warning-hover: #fcd34d;       /* Amber 300 */
+  --warning-bg: #78350f;          /* Amber 900 */
+  
+  --danger-color: #f87171;        /* Red 400 */
+  --danger-hover: #fca5a5;        /* Red 300 */
+  --danger-bg: #7f1d1d;           /* Red 900 */
+
+  --info-color: #22d3ee;          /* Cyan 400 */
+  --info-hover: #67e8f9;          /* Cyan 300 */
+  --info-bg: #164e63;             /* Cyan 900 */
+  --primary-dark: var(--primary-active);
+  --bg-color: var(--bg-secondary);
+  --text-color: var(--text-primary);
+
+  /* Superfícies e Fundos - High Contrast for Borderless Design */
+  --bg-primary: #020617;          /* Slate 950 - Shell */
+  --bg-secondary: #020617;        /* Slate 950 - Body Background */
+  --bg-tertiary: #111827;         /* Slate 900 - Superfícies elevadas */
+  --bg-card: #1e293b;             /* Slate 800 - Card Background */
+  --bg-modal: #1e293b;
+  --bg-dropdown: #1e293b;
+
+  /* Texto e Conteúdo */
+  --text-primary: #f8fafc;        /* Slate 50 */
+  --text-secondary: #cbd5e1;      /* Slate 300 */
+  --text-muted: #94a3b8;          /* Slate 400 */
+  --text-inverted: #0f172a;       /* Slate 900 */
+
+  /* Bordas e Divisores */
+  --border-color: #1f2937;        /* Slate 800 para contraste */
+  --border-hover: #374151;        /* Slate 700 */
+  --border-light: #020617;        /* Aproxima do fundo para bordas suaves */
+
+  /* Sombras (Dark Mode) - Deep shadows for depth */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.2);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  --shadow-inner: inset 0 2px 4px 0 rgba(0, 0, 0, 0.3);
+}

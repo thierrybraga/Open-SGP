@@ -1,0 +1,321 @@
+{% extends 'base.html' %}
+
+{% block title %}Ordens de Serviço - ISP ERP{% endblock %}
+
+{% block styles %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+{% endblock %}
+
+{% block content %}
+<div class="container animate__animated animate__fadeInUp">
+
+  <!-- Breadcrumbs -->
+  <nav aria-label="Breadcrumb" class="breadcrumb">
+    <span class="breadcrumb-item">
+      <a href="/">Home</a>
+    </span>
+    <span class="breadcrumb-separator" aria-hidden="true">/</span>
+    <span class="breadcrumb-item">Ordens de Serviço</span>
+  </nav>
+
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="page-header-content">
+      <h1 class="page-title">Ordens de Serviço</h1>
+      <p class="page-subtitle">Gerencie as visitas técnicas e instalações</p>
+    </div>
+    <div class="page-header-actions">
+      <button type="button" class="btn btn-outline-primary" onclick="window.location.reload()">
+        <span aria-hidden="true">🔄</span>
+        Atualizar
+      </button>
+      <button type="button" class="btn btn-primary" onclick="resetServiceOrderForm(); ISP_ERP.openModal('modal-so')">
+        <span aria-hidden="true">➕</span>
+        Nova O.S.
+      </button>
+    </div>
+  </header>
+
+  <!-- Filters -->
+  <div id="filter-container"></div>
+
+  <!-- Data Table -->
+  <div class="card">
+    <div class="card-header">
+      <h2 class="card-title">Agenda Recente</h2>
+    </div>
+    <div class="card-body">
+      <div id="table-container"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Modal: New Service Order -->
+<div id="modal-so" class="modal-overlay" style="display: none;">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h2 class="modal-title" id="modal-title">Nova Ordem de Serviço</h2>
+      <button class="modal-close" aria-label="Fechar modal" onclick="ISP_ERP.closeModal('modal-so')">✕</button>
+    </div>
+    <div class="modal-body">
+      <form id="form-so" method="post" data-validate>
+        
+        <div class="form-row">
+          <input type="hidden" id="service_order_id" name="service_order_id">
+          <div class="form-group">
+            <label for="client_id" class="form-label required">Cliente</label>
+            <select id="client_id" name="client_id" class="form-control" required>
+              <option value="">Selecione um cliente...</option>
+              {% for client in clients %}
+              <option value="{{ client.id }}">{{ client.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="type" class="form-label required">Tipo</label>
+            <select id="type" name="type" class="form-control" required>
+              <option value="install">Instalação</option>
+              <option value="repair">Reparo</option>
+              <option value="relocation">Mudança de Endereço</option>
+              <option value="removal">Retirada</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="priority" class="form-label required">Prioridade</label>
+            <select id="priority" name="priority" class="form-control" required>
+              <option value="low">Baixa</option>
+              <option value="medium" selected>Média</option>
+              <option value="high">Alta</option>
+              <option value="urgent">Urgente</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="technician_name" class="form-label">Técnico (Opcional)</label>
+            <input type="text" id="technician_name" name="technician_name" class="form-control" placeholder="Nome do técnico" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="scheduled_at" class="form-label">Agendamento (Opcional)</label>
+          <input type="datetime-local" id="scheduled_at" name="scheduled_at" class="form-control" />
+        </div>
+
+        <div class="form-group">
+          <label for="notes" class="form-label">Observações</label>
+          <textarea id="notes" name="notes" class="form-control" rows="3"></textarea>
+        </div>
+        
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary" onclick="ISP_ERP.closeModal('modal-so')">Cancelar</button>
+      <button type="submit" form="form-so" class="btn btn-primary">Criar O.S.</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/advanced-components.js') }}"></script>
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+
+    // Filter Panel
+    const filterPanel = new ISP_Components.FilterPanel({
+      container: '#filter-container',
+      filters: [
+        { type: 'select', name: 'status', label: 'Status', options: [
+          { value: 'open', label: 'Aberta' },
+          { value: 'scheduled', label: 'Agendada' },
+          { value: 'in_progress', label: 'Em Execução' },
+          { value: 'completed', label: 'Concluída' },
+          { value: 'canceled', label: 'Cancelada' }
+        ]},
+        { type: 'select', name: 'type', label: 'Tipo', options: [
+          { value: 'install', label: 'Instalação' },
+          { value: 'repair', label: 'Reparo' },
+          { value: 'relocation', label: 'Mudança' },
+          { value: 'removal', label: 'Retirada' }
+        ]}
+      ],
+      onApply: (filters) => {
+        const params = new URLSearchParams(window.location.search);
+        Object.keys(filters).forEach(key => {
+           if(filters[key]) params.set(key, filters[key]);
+           else params.delete(key);
+        });
+        window.location.search = params.toString();
+      },
+      onReset: () => {
+        window.location.href = window.location.pathname;
+      }
+    });
+
+    // Data
+    const soData = [
+      {% for item in items %}
+      {
+        id: {{ item.id }},
+        client_id: {{ item.client_id or 'null' }},
+        client: '{{ item.client.name | replace("'", "\\'") if item.client else "N/A" }}',
+        type: '{{ item.type }}',
+        status: '{{ item.status }}',
+        priority: '{{ item.priority }}',
+        technician: '{{ item.technician_name or "" }}',
+        scheduled_at_raw: '{{ item.scheduled_at.strftime("%Y-%m-%dT%H:%M") if item.scheduled_at else "" }}',
+        scheduled_at: '{{ item.scheduled_at.strftime("%d/%m/%Y %H:%M") if item.scheduled_at else "-" }}',
+        notes: '{{ item.notes | replace("\n", "\\n") | replace("'", "\\'") if item.notes else "" }}',
+        created_at: '{{ item.created_at.strftime("%d/%m/%Y %H:%M") }}'
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    // Helper for badges
+    const getStatusBadge = (status) => {
+      const map = {
+        'open': { class: 'warning', text: 'Aberta' },
+        'scheduled': { class: 'info', text: 'Agendada' },
+        'in_progress': { class: 'info', text: 'Executando' },
+        'completed': { class: 'success', text: 'Concluída' },
+        'canceled': { class: 'error', text: 'Cancelada' }
+      };
+      const s = map[status] || { class: 'secondary', text: status };
+      return `<span class="status-indicator ${s.class}">${s.text}</span>`;
+    };
+
+    const getTypeBadge = (type) => {
+      const map = {
+        'install': 'Instalação',
+        'repair': 'Reparo',
+        'relocation': 'Mudança',
+        'removal': 'Retirada'
+      };
+      return map[type] || type;
+    };
+
+    // Data Table
+    const dataTable = new ISP_Components.DataTable({
+      container: '#table-container',
+      columns: [
+        { field: 'id', label: 'ID', sortable: true },
+        { field: 'client', label: 'Cliente', sortable: true },
+        { 
+          field: 'type', 
+          label: 'Tipo',
+          render: (val) => getTypeBadge(val)
+        },
+        { 
+          field: 'status', 
+          label: 'Status', 
+          render: (val) => getStatusBadge(val) 
+        },
+        { field: 'technician', label: 'Técnico' },
+        { field: 'scheduled_at', label: 'Agendamento', sortable: true },
+        {
+          field: 'actions',
+          label: 'Ações',
+          render: (val, row) => `
+            <div class="table-actions">
+              <button type="button" class="btn-icon" title="Editar" onclick="editOrder(${row.id})">
+                <i class="fas fa-edit"></i> ✏️
+              </button>
+              <button type="button" class="btn-icon danger" title="Excluir" onclick="deleteOrder(${row.id})">
+                <i class="fas fa-trash"></i> 🗑️
+              </button>
+            </div>
+          `
+        }
+      ],
+      data: soData,
+      pagination: true,
+      itemsPerPage: 10
+    });
+
+    window.resetServiceOrderForm = () => {
+      document.getElementById('form-so').reset();
+      document.getElementById('service_order_id').value = '';
+      document.getElementById('modal-title').textContent = 'Nova Ordem de Serviço';
+    };
+
+    // Remove legacy listeners
+    // document.querySelectorAll('[data-modal-target="modal-so"]').forEach(...)
+    // document.querySelectorAll('[data-modal-close]').forEach(...)
+    
+    // Close modal on outside click
+    window.addEventListener('click', (e) => {
+      const modal = document.getElementById('modal-so');
+      if (e.target === modal) {
+        ISP_ERP.closeModal('modal-so');
+      }
+    });
+
+    // Edit Order
+    window.editOrder = (id) => {
+      const item = soData.find(i => i.id === id);
+      if (!item) return;
+
+      document.getElementById('modal-title').textContent = 'Editar Ordem de Serviço #' + id;
+      document.getElementById('service_order_id').value = item.id;
+      
+      // Populate fields
+      if (item.client_id) document.getElementById('client_id').value = item.client_id;
+      document.getElementById('type').value = item.type;
+      document.getElementById('priority').value = item.priority;
+      document.getElementById('technician_name').value = item.technician;
+      if (item.scheduled_at_raw) document.getElementById('scheduled_at').value = item.scheduled_at_raw;
+      document.getElementById('notes').value = item.notes;
+
+      ISP_ERP.openModal('modal-so');
+    };
+
+    // Delete Order
+    window.deleteOrder = (id) => {
+      ISP_ERP.confirm('Tem certeza que deseja excluir esta Ordem de Serviço?', (confirmed) => {
+        if (!confirmed) return;
+        
+        fetch(`/admin/service-orders/${id}/delete`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                if (window.UI && window.UI.toast) {
+                    UI.toast.success('Ordem de serviço excluída com sucesso!');
+                } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.success('Ordem de serviço excluída com sucesso!');
+                } else {
+                    alert('Ordem de serviço excluída com sucesso!');
+                }
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                if (window.UI && window.UI.toast) {
+                    UI.toast.error('Erro ao excluir: ' + (data.error || 'Erro desconhecido'));
+                } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                    ISP_AdvancedComponents.Toast.error('Erro ao excluir: ' + (data.error || 'Erro desconhecido'));
+                } else {
+                    alert('Erro ao excluir: ' + (data.error || 'Erro desconhecido'));
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            if (window.UI && window.UI.toast) {
+                UI.toast.error('Erro ao excluir ordem de serviço');
+            } else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) {
+                ISP_AdvancedComponents.Toast.error('Erro ao excluir ordem de serviço');
+            } else {
+                alert('Erro ao excluir ordem de serviço');
+            }
+        });
+      });
+    };
+  });
+</script>
+{% endblock %}
