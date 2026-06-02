@@ -9,7 +9,8 @@ Integrações:
 - shared.models
 """
 
-from sqlalchemy import String, Boolean, ForeignKey, Float, DateTime, Index
+from decimal import Decimal
+from sqlalchemy import String, Boolean, ForeignKey, DateTime, Index, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ....core.database import Base
@@ -35,7 +36,7 @@ class PaymentCharge(Base, TimestampMixin):
     gateway_id: Mapped[int] = mapped_column(ForeignKey("payment_gateway_configs.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(20), default="created")  # created, paid, canceled
     reference: Mapped[str] = mapped_column(String(100))
-    amount: Mapped[float] = mapped_column(Float, default=0.0)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0)
     payment_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
     paid_at: Mapped[DateTime | None] = mapped_column(DateTime, nullable=True)

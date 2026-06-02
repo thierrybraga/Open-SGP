@@ -21,7 +21,7 @@ from .schemas import PermissionCreate, PermissionOut
 router = APIRouter()
 
 
-@router.get("/", response_model=List[PermissionOut])
+@router.get("/", response_model=List[PermissionOut], dependencies=[Depends(require_permissions("permissions.read"))])
 def list_permissions(db: Session = Depends(get_db)):
     perms = db.query(Permission).all()
     return [PermissionOut(id=p.id, code=p.code, description=p.description) for p in perms]

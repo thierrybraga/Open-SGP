@@ -15,6 +15,7 @@ Referências:
 - Linha Digitável: 47 posições
 """
 from datetime import datetime, date
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional
 
 
@@ -23,6 +24,8 @@ class BoletoGenerator:
 
     # Data base para cálculo do fator de vencimento (07/10/1997)
     DATA_BASE = datetime(1997, 10, 7).date()
+    DATA_REINICIO_FATOR = datetime(2025, 2, 22).date()
+    FATOR_REINICIO = 1000
 
     @staticmethod
     def calcular_digito_modulo10(codigo: str) -> str:
@@ -92,9 +95,9 @@ class BoletoGenerator:
         """
         Calcula fator de vencimento (posições 6-9 do código de barras).
 
-        Fator = número de dias entre 07/10/1997 e data de vencimento.
-        Válido até 21/02/2025 (fator 9999).
-        Após essa data, usar fator absoluto ou renovar base.
+        Fator = número de dias entre 07/10/1997 e data de vencimento até
+        21/02/2025. A partir de 22/02/2025, a regra FEBRABAN reinicia o
+        fator em 1000 e segue incrementando diariamente.
 
         Args:
             data_vencimento: Data de vencimento do boleto
@@ -105,23 +108,18 @@ class BoletoGenerator:
         if data_vencimento < BoletoGenerator.DATA_BASE:
             raise ValueError("Data de vencimento não pode ser anterior a 07/10/1997")
 
-        delta = data_vencimento - BoletoGenerator.DATA_BASE
-        fator = delta.days
+        if data_vencimento >= BoletoGenerator.DATA_REINICIO_FATOR:
+            delta_reinicio = data_vencimento - BoletoGenerator.DATA_REINICIO_FATOR
+            return BoletoGenerator.FATOR_REINICIO + delta_reinicio.days
 
-        if fator > 9999:
-            # Após 21/02/2025, usar fator cíclico ou implementar nova base
-            fator = fator % 9999
-            if fator == 0:
-                fator = 1
-
-        return fator
+        return (data_vencimento - BoletoGenerator.DATA_BASE).days
 
     @staticmethod
     def gerar_codigo_barras(
         banco: str,
         moeda: str,
         vencimento: date,
-        valor: float,
+        valor: Decimal | float | str,
         campo_livre: str
     ) -> str:
         """
@@ -161,7 +159,8 @@ class BoletoGenerator:
         fator_str = f"{fator:04d}"
 
         # Formata valor (10 posições, sem vírgula)
-        valor_centavos = int(valor * 100)
+        valor_decimal = Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        valor_centavos = int((valor_decimal * 100).to_integral_value(rounding=ROUND_HALF_UP))
         valor_str = f"{valor_centavos:010d}"
 
         # Monta código sem DV (posições 1-4, 6-44)
@@ -337,7 +336,7 @@ class BoletoData:
         carteira: str,
         nosso_numero: str,
         vencimento: date,
-        valor: float,
+        valor: Decimal | float | str,
         cedente_nome: str,
         cedente_documento: str,
         sacado_nome: str,
@@ -355,7 +354,7 @@ class BoletoData:
         self.carteira = carteira
         self.nosso_numero = nosso_numero
         self.vencimento = vencimento
-        self.valor = valor
+        self.valor = Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         self.cedente_nome = cedente_nome
         self.cedente_documento = cedente_documento
         self.sacado_nome = sacado_nome

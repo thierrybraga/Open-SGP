@@ -13,6 +13,7 @@ Integrações:
 
 import os
 import time
+import structlog
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
@@ -20,6 +21,8 @@ from sqlalchemy import create_engine
 from ...core.config import settings
 from .models import MessageQueue
 from .service import dispatch_message
+
+logger = structlog.get_logger(__name__)
 
 
 def run_worker(sleep_seconds: int = 2):
@@ -58,8 +61,8 @@ def run_worker(sleep_seconds: int = 2):
                 )
                 for msg in pending:
                     dispatch_message(db, msg)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.exception("communication_worker_iteration_failed", error=str(exc))
             time.sleep(sleep_seconds)
     finally:
         try:

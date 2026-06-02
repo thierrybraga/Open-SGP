@@ -23,7 +23,7 @@ from ..roles.models import Role
 router = APIRouter()
 
 
-@router.get("/", response_model=List[UserOut])
+@router.get("/", response_model=List[UserOut], dependencies=[Depends(require_permissions("users.read"))])
 def list_users(db: Session = Depends(get_db)):
     users = db.query(User).all()
     return [UserOut(id=u.id, username=u.username, email=u.email, is_active=u.is_active, roles=[r.name for r in u.roles]) for u in users]
@@ -46,7 +46,7 @@ def update_user_endpoint(user_id: int, data: UserUpdate, db: Session = Depends(g
     return UserOut(id=user.id, username=user.username, email=user.email, is_active=user.is_active, roles=[r.name for r in user.roles])
 
 
-@router.get("/{user_id}", response_model=UserOut)
+@router.get("/{user_id}", response_model=UserOut, dependencies=[Depends(require_permissions("users.read"))])
 def get_user(user_id: int, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

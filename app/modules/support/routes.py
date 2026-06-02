@@ -31,7 +31,7 @@ from .service import create_ticket, add_message, update_ticket, create_occurrenc
 router = APIRouter()
 
 
-@router.get("/tickets", response_model=List[TicketOut])
+@router.get("/tickets", response_model=List[TicketOut], dependencies=[Depends(require_permissions("support.tickets.read"))])
 def list_tickets(
     status_: Optional[str] = Query(default=None, alias="status"),
     priority: Optional[str] = Query(default=None),
@@ -77,7 +77,7 @@ def add_message_endpoint(ticket_id: int, data: MessageCreate, db: Session = Depe
     return m
 
 
-@router.get("/occurrences", response_model=List[OccurrenceOut])
+@router.get("/occurrences", response_model=List[OccurrenceOut], dependencies=[Depends(require_permissions("support.occurrences.read"))])
 def list_occurrences(
     status_: Optional[str] = Query(default=None, alias="status"),
     severity: Optional[str] = Query(default=None),
@@ -116,7 +116,7 @@ def update_occurrence_endpoint(occurrence_id: int, data: OccurrenceUpdate, db: S
     return o
 
 
-@router.get("/occurrences/{occurrence_id}", response_model=OccurrenceOut)
+@router.get("/occurrences/{occurrence_id}", response_model=OccurrenceOut, dependencies=[Depends(require_permissions("support.occurrences.read"))])
 def get_occurrence_endpoint(occurrence_id: int, db: Session = Depends(get_db)):
     o = db.query(Occurrence).filter(Occurrence.id == occurrence_id).first()
     if not o:

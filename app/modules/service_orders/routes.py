@@ -30,7 +30,7 @@ from .service import create_order, update_order, add_item, assign_technician, co
 router = APIRouter()
 
 
-@router.get("/orders", response_model=List[ServiceOrderOut])
+@router.get("/orders", response_model=List[ServiceOrderOut], dependencies=[Depends(require_permissions("service_orders.read"))])
 def list_orders(
     status_: Optional[str] = Query(default=None, alias="status"),
     type_: Optional[str] = Query(default=None, alias="type"),
@@ -163,7 +163,7 @@ def complete_order_endpoint(order_id: int, db: Session = Depends(get_db)):
     )
 
 
-@router.get("/orders/{order_id}", response_model=ServiceOrderOut)
+@router.get("/orders/{order_id}", response_model=ServiceOrderOut, dependencies=[Depends(require_permissions("service_orders.read"))])
 def get_order(order_id: int, db: Session = Depends(get_db)):
     o = db.query(ServiceOrder).filter(ServiceOrder.id == order_id).first()
     if not o:

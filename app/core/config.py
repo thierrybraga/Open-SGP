@@ -121,6 +121,15 @@ class Settings(BaseModel):
     # Fiscal certificate A1 (PFX) configuration
     a1_cert_pfx_path: str = os.getenv("A1_CERT_PFX_PATH", "")
     a1_cert_password: str = os.getenv("A1_CERT_PASSWORD", "")
+    sefaz_environment: str = os.getenv("SEFAZ_ENVIRONMENT", "homologacao")
+    sefaz_uf: str = os.getenv("SEFAZ_UF", "SP")
+
+    @validator('sefaz_environment')
+    def validate_sefaz_environment(cls, v):
+        valid_environments = ["homologacao", "producao"]
+        if v not in valid_environments:
+            raise ValueError(f"Invalid SEFAZ_ENVIRONMENT '{v}'. Must be one of: {', '.join(valid_environments)}")
+        return v
 
     # Sentry monitoring
     sentry_dsn: str = os.getenv("SENTRY_DSN", "")
@@ -134,6 +143,14 @@ class Settings(BaseModel):
     # Feature flags
     feature_2fa_enabled: bool = os.getenv("FEATURE_2FA_ENABLED", "false").lower() == "true"
     feature_2fa_required_admin: bool = os.getenv("FEATURE_2FA_REQUIRED_ADMIN", "false").lower() == "true"
+    public_registration_enabled: bool = os.getenv("PUBLIC_REGISTRATION_ENABLED", "false").lower() == "true"
+
+    # Bootstrap controls
+    auto_create_tables: bool = os.getenv("AUTO_CREATE_TABLES", "false").lower() == "true"
+    bootstrap_admin_enabled: bool = os.getenv("BOOTSTRAP_ADMIN_ENABLED", "false").lower() == "true"
+    bootstrap_admin_username: str = os.getenv("BOOTSTRAP_ADMIN_USERNAME", "admin")
+    bootstrap_admin_email: str = os.getenv("BOOTSTRAP_ADMIN_EMAIL", "admin@example.com")
+    bootstrap_admin_password: str = os.getenv("BOOTSTRAP_ADMIN_PASSWORD", "")
 
     # Token blacklist (logout) TTL in seconds
     token_blacklist_ttl: int = int(os.getenv("TOKEN_BLACKLIST_TTL", str(60 * 60 * 24)))  # 24 hours
@@ -158,6 +175,20 @@ class Settings(BaseModel):
     def is_testing(self) -> bool:
         """Check if running in testing"""
         return self.environment == "testing"
+
+    def should_auto_create_tables(self) -> bool:
+        """
+        Allow metadata.create_all only when explicitly requested or during tests.
+
+        Production schema changes must be handled through Alembic migrations.
+        """
+        return self.auto_create_tables or self.is_testing()
+
+    def should_bootstrap_admin(self) -> bool:
+        """
+        Create an initial admin user only when explicitly enabled with a password.
+        """
+        return self.bootstrap_admin_enabled and bool(self.bootstrap_admin_password)
 
 
 settings = Settings()

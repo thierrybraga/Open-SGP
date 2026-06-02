@@ -11,7 +11,8 @@ Integrações:
 """
 
 from datetime import date, datetime
-from sqlalchemy import String, Boolean, Float, ForeignKey, Index, Date, DateTime, Integer
+from decimal import Decimal
+from sqlalchemy import String, Boolean, Float, ForeignKey, Index, Date, DateTime, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ...core.database import Base
@@ -27,7 +28,7 @@ class Title(Base, TimestampMixin):
     due_date: Mapped[date] = mapped_column(Date, index=True)
     paid_date: Mapped[date | None] = mapped_column(Date, nullable=True)
 
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     status: Mapped[str] = mapped_column(String(20), index=True)  # open, paid, canceled, overdue
 
     fine_percent: Mapped[float] = mapped_column(Float, default=2.0)
@@ -50,7 +51,7 @@ class Payment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title_id: Mapped[int] = mapped_column(ForeignKey("titles.id", ondelete="CASCADE"), index=True)
     payment_date: Mapped[date] = mapped_column(Date)
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     method: Mapped[str] = mapped_column(String(20))  # boleto, pix, cash
 
     title = relationship("Title")
@@ -72,7 +73,7 @@ class RemittanceItem(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     remittance_id: Mapped[int] = mapped_column(ForeignKey("remittances.id", ondelete="CASCADE"), index=True)
     title_id: Mapped[int] = mapped_column(ForeignKey("titles.id", ondelete="CASCADE"), index=True)
-    value: Mapped[float] = mapped_column(Float)
+    value: Mapped[Decimal] = mapped_column(Numeric(12, 2))
 
 
 class ReturnFile(Base, TimestampMixin):
@@ -91,7 +92,7 @@ class ReturnItem(Base, TimestampMixin):
     return_file_id: Mapped[int] = mapped_column(ForeignKey("return_files.id", ondelete="CASCADE"), index=True)
     title_id: Mapped[int] = mapped_column(ForeignKey("titles.id", ondelete="SET NULL"), nullable=True)
     status: Mapped[str] = mapped_column(String(20))  # paid, canceled, other
-    value: Mapped[float] = mapped_column(Float)
+    value: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     occurred_at: Mapped[date] = mapped_column(Date)
 
 
@@ -103,7 +104,7 @@ class PaymentPromise(Base, TimestampMixin):
     contract_id: Mapped[int] = mapped_column(ForeignKey("contracts.id", ondelete="CASCADE"), index=True)
     title_id: Mapped[int | None] = mapped_column(ForeignKey("titles.id", ondelete="SET NULL"), nullable=True)
     promised_date: Mapped[date] = mapped_column(Date)
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     status: Mapped[str] = mapped_column(String(20), default="open")  # open, kept, broken
     notes: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
@@ -114,7 +115,7 @@ class TitleAdjustment(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     title_id: Mapped[int] = mapped_column(ForeignKey("titles.id", ondelete="CASCADE"), index=True)
     type: Mapped[str] = mapped_column(String(20))  # increase, discount
-    amount: Mapped[float] = mapped_column(Float)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     reason: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     title = relationship("Title")

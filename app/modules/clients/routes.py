@@ -23,7 +23,7 @@ from .service import create_client, update_client
 router = APIRouter()
 
 
-@router.get("/", response_model=List[ClientOut])
+@router.get("/", response_model=List[ClientOut], dependencies=[Depends(require_permissions("clients.read"))])
 def list_clients(
     name: Optional[str] = Query(default=None),
     document: Optional[str] = Query(default=None),
@@ -95,24 +95,6 @@ def update_client_endpoint(client_id: int, data: ClientUpdate, db: Session = Dep
     )
 
 
-@router.get("/{client_id}", response_model=ClientOut)
-def get_client(client_id: int, db: Session = Depends(get_db)):
-    c = db.query(Client).filter(Client.id == client_id).first()
-    if not c:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
-    return ClientOut(
-        id=c.id,
-        person_type=c.person_type,
-        name=c.name,
-        document=c.document,
-        email=c.email,
-        phone=c.phone,
-        is_active=c.is_active,
-        addresses=[AddressOut(**a.__dict__) for a in c.addresses],
-        contacts=[ContactOut(**ct.__dict__) for ct in c.contacts],
-    )
-
-
 @router.post("/{client_id}/approve", response_model=ClientOut, dependencies=[Depends(require_permissions("clients.approve"))])
 def approve_client(
     client_id: int,
@@ -171,7 +153,7 @@ def reject_client(client_id: int, reason: str, db: Session = Depends(get_db)):
 
 # ===== DASHBOARD =====
 
-@router.get("/dashboard/summary")
+@router.get("/dashboard/summary", dependencies=[Depends(require_permissions("clients.read"))])
 def get_clients_dashboard_summary(db: Session = Depends(get_db)):
     """
     Retorna resumo estatístico de clientes.
@@ -180,7 +162,7 @@ def get_clients_dashboard_summary(db: Session = Depends(get_db)):
     return get_clients_summary(db)
 
 
-@router.get("/dashboard/by-city")
+@router.get("/dashboard/by-city", dependencies=[Depends(require_permissions("clients.read"))])
 def get_clients_by_city_stats(
     limit: int = Query(default=10, le=50),
     db: Session = Depends(get_db)
@@ -192,7 +174,7 @@ def get_clients_by_city_stats(
     return get_clients_by_city(db, limit)
 
 
-@router.get("/dashboard/by-state")
+@router.get("/dashboard/by-state", dependencies=[Depends(require_permissions("clients.read"))])
 def get_clients_by_state_stats(db: Session = Depends(get_db)):
     """
     Retorna clientes agrupados por estado.
@@ -201,7 +183,7 @@ def get_clients_by_state_stats(db: Session = Depends(get_db)):
     return get_clients_by_state(db)
 
 
-@router.get("/dashboard/recent")
+@router.get("/dashboard/recent", dependencies=[Depends(require_permissions("clients.read"))])
 def get_recent_clients_list(
     days: int = Query(default=30, le=365),
     limit: int = Query(default=10, le=100),
@@ -225,7 +207,7 @@ def get_recent_clients_list(
     ]
 
 
-@router.get("/dashboard/growth")
+@router.get("/dashboard/growth", dependencies=[Depends(require_permissions("clients.read"))])
 def get_clients_growth_stats(
     months: int = Query(default=12, le=24),
     db: Session = Depends(get_db)
@@ -237,7 +219,7 @@ def get_clients_growth_stats(
     return get_clients_growth(db, months)
 
 
-@router.get("/dashboard/debt")
+@router.get("/dashboard/debt", dependencies=[Depends(require_permissions("clients.read"))])
 def get_clients_debt_stats(db: Session = Depends(get_db)):
     """
     Retorna estatísticas de clientes com dívidas.
@@ -246,7 +228,7 @@ def get_clients_debt_stats(db: Session = Depends(get_db)):
     return get_clients_with_debt(db)
 
 
-@router.get("/dashboard/top-revenue")
+@router.get("/dashboard/top-revenue", dependencies=[Depends(require_permissions("clients.read"))])
 def get_top_clients_revenue(
     limit: int = Query(default=10, le=50),
     db: Session = Depends(get_db)
@@ -258,11 +240,29 @@ def get_top_clients_revenue(
     return get_top_clients_by_revenue(db, limit)
 
 
-@router.get("/dashboard/complete")
+@router.get("/dashboard/complete", dependencies=[Depends(require_permissions("clients.read"))])
 def get_complete_dashboard(db: Session = Depends(get_db)):
     """
     Retorna dashboard completo de clientes com todas as estatísticas.
     """
     from .dashboard import get_clients_dashboard_complete
     return get_clients_dashboard_complete(db)
+
+
+@router.get("/{client_id}", response_model=ClientOut, dependencies=[Depends(require_permissions("clients.read"))])
+def get_client(client_id: int, db: Session = Depends(get_db)):
+    c = db.query(Client).filter(Client.id == client_id).first()
+    if not c:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Client not found")
+    return ClientOut(
+        id=c.id,
+        person_type=c.person_type,
+        name=c.name,
+        document=c.document,
+        email=c.email,
+        phone=c.phone,
+        is_active=c.is_active,
+        addresses=[AddressOut(**a.__dict__) for a in c.addresses],
+        contacts=[ContactOut(**ct.__dict__) for ct in c.contacts],
+    )
 

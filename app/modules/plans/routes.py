@@ -22,7 +22,7 @@ from .service import create_plan, update_plan
 router = APIRouter()
 
 
-@router.get("/", response_model=List[PlanOut])
+@router.get("/", response_model=List[PlanOut], dependencies=[Depends(require_permissions("plans.read"))])
 def list_plans(
     category: Optional[str] = Query(default=None),
     active: Optional[bool] = Query(default=None),
@@ -60,7 +60,7 @@ def update_plan_endpoint(plan_id: int, data: PlanUpdate, db: Session = Depends(g
     return PlanOut(**p.__dict__)
 
 
-@router.get("/{plan_id}", response_model=PlanOut)
+@router.get("/{plan_id}", response_model=PlanOut, dependencies=[Depends(require_permissions("plans.read"))])
 def get_plan(plan_id: int, db: Session = Depends(get_db)):
     p = db.query(Plan).filter(Plan.id == plan_id).first()
     if not p:

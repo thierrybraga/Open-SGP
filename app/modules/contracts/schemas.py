@@ -31,6 +31,7 @@ class ContractCreate(ContractBase):
 
 
 class ContractUpdate(BaseModel):
+    plan_id: Optional[int] = None
     status: Optional[str] = None
     end_date: Optional[date] = None
     installation_address: Optional[str] = None

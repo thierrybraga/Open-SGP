@@ -11,6 +11,7 @@ Integrações:
 """
 
 from datetime import datetime, date
+from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from .models import Title, Payment, Remittance, RemittanceItem, ReturnFile, ReturnItem, PaymentPromise, TitleAdjustment
@@ -20,13 +21,16 @@ from ..contracts.models import Contract
 from ..plans.models import Plan
 from ...shared.boleto import BoletoGenerator, BoletoData
 from ...shared.cnab import CNAB240Generator, CNAB400Generator
+from ...shared.money import cents, money, money_float
 
 
 def create_title(db: Session, data: TitleCreate) -> Title:
     contract = db.query(Contract).filter(Contract.id == data.contract_id).first()
     if not contract:
         raise ValueError("Contract not found")
-    title = Title(**data.dict())
+    values = data.dict()
+    values["amount"] = money(values["amount"])
+    title = Title(**values)
     db.add(title)
     db.commit()
     db.refresh(title)
@@ -35,6 +39,8 @@ def create_title(db: Session, data: TitleCreate) -> Title:
 
 def update_title(db: Session, title: Title, data: TitleUpdate) -> Title:
     for field, value in data.dict(exclude_none=True).items():
+        if field == "amount":
+            value = money(value)
         setattr(title, field, value)
     db.add(title)
     db.commit()
@@ -78,7 +84,7 @@ def generate_boleto(db: Session, title: Title) -> Title:
         banco=banco_codigo,
         moeda="9",  # Real
         vencimento=title.due_date,
-        valor=float(title.amount),
+        valor=money(title.amount),
         campo_livre=campo_livre
     )
 
@@ -89,8 +95,7 @@ def generate_boleto(db: Session, title: Title) -> Title:
     title.bar_code = codigo_barras
     title.digitable_line = linha_digitavel  # Certifique-se que este campo existe no modelo
 
-    # URL do boleto (pode integrar com serviço de geração de PDF)
-    title.payment_slip_url = f"https://boleto.example.com/view/{title.id}/{codigo_barras}"
+    title.payment_slip_url = f"/api/billing/boleto/{title.id}/pdf"
 
     db.add(title)
     db.commit()
@@ -98,8 +103,8 @@ def generate_boleto(db: Session, title: Title) -> Title:
     return title
 
 
-def register_payment(db: Session, title: Title, amount: float, method: str) -> Title:
-    payment = Payment(title_id=title.id, payment_date=datetime.utcnow().date(), amount=amount, method=method)
+def register_payment(db: Session, title: Title, amount: Decimal | float | str, method: str) -> Title:
+    payment = Payment(title_id=title.id, payment_date=datetime.utcnow().date(), amount=money(amount), method=method)
     db.add(payment)
     title.status = "paid"
     title.paid_date = datetime.utcnow().date()
@@ -134,17 +139,17 @@ def process_return(db: Session, data: ReturnCreate) -> ReturnFile:
     for item in data.items:
         title_id = item.get("title_id")
         status = item.get("status")
-        value = float(item.get("value", 0))
+        value = money(item.get("value", 0))
         occurred_date = item.get("occurred_at")
         db.add(ReturnItem(return_file_id=rf.id, title_id=title_id, status=status, value=value, occurred_at=occurred_date))
         if title_id:
             t = db.query(Title).filter(Title.id == title_id).first()
             if t:
-                if status == "paid" and abs(value - t.amount) < 0.01:
+                if status == "paid" and abs(value - money(t.amount)) <= Decimal("0.01"):
                     t.status = "paid"
                     t.paid_date = datetime.utcnow().date()
                     db.add(Payment(title_id=t.id, payment_date=datetime.utcnow().date(), amount=value, method="boleto"))
-                elif status in ("paid", "partial") and value > 0 and value < t.amount:
+                elif status in ("paid", "partial") and value > 0 and value < money(t.amount):
                     t.status = "partial"
                     db.add(Payment(title_id=t.id, payment_date=datetime.utcnow().date(), amount=value, method="boleto"))
                     db.add(t)
@@ -162,12 +167,13 @@ def _calc_cnab_values(db: Session, title: Title) -> dict:
         .filter(FinancialParameter.company_id.isnot(None))
         .first()
     )
-    fine = (fp.fine_percent if fp else title.fine_percent) / 100.0
-    interest = (fp.interest_percent if fp else title.interest_percent) / 100.0
+    fine = Decimal(str(fp.fine_percent if fp else title.fine_percent)) / Decimal("100")
+    interest = Decimal(str(fp.interest_percent if fp else title.interest_percent)) / Decimal("100")
+    amount = money(title.amount)
     return {
-        "amount_cents": int(round(title.amount * 100)),
-        "fine_cents": int(round(title.amount * fine * 100)),
-        "daily_interest_cents": int(round(title.amount * interest / 30.0 * 100)),
+        "amount_cents": cents(amount),
+        "fine_cents": cents(amount * fine),
+        "daily_interest_cents": cents(amount * interest / Decimal("30")),
     }
 
 
@@ -219,7 +225,7 @@ def generate_cnab_layout(bank_code: str, layout: str, titles: list[Title], value
                 "carteira": carrier.wallet if carrier else "09",
                 "documento_numero": title.document_number or str(title.id),
                 "vencimento": title.due_date,
-                "valor": float(title.amount),
+                "valor": money_float(title.amount),
                 "especie": "02",  # 02=Duplicata Mercantil
                 "aceite": "N",
                 "data_emissao": title.issue_date or date.today(),
@@ -253,7 +259,7 @@ def generate_cnab_layout(bank_code: str, layout: str, titles: list[Title], value
                 "nosso_numero": title.our_number or str(title.id).zfill(11),
                 "documento_numero": title.document_number or str(title.id),
                 "vencimento": title.due_date,
-                "valor": float(title.amount)
+                "valor": money_float(title.amount)
             }
             titulos_cnab.append(titulo_dict)
 
@@ -322,13 +328,13 @@ def generate_carne(db: Session, data: CarneCreate) -> CarneOut:
             first_due = due_dt
         last_due = due_dt
 
-        amount = data.amount if data.amount is not None else (contract.price_override or 0.0)
-        if amount == 0.0 and contract.plan:
+        amount = money(data.amount if data.amount is not None else (contract.price_override or 0))
+        if amount == 0 and contract.plan:
             # Fallback: if no override, attempt use plan price via attribute if exists
             try:
-                amount = float(getattr(contract.plan, "price"))
+                amount = money(getattr(contract.plan, "price"))
             except Exception:
-                amount = 0.0
+                amount = money(0)
 
         doc = f"DOC-{contract.id}-{due_year:04d}{due_month:02d}-{i+1:02d}"
         our = f"NOSSO-{contract.id}-{due_year:04d}{due_month:02d}-{i+1:02d}"
@@ -364,21 +370,21 @@ def create_adjustment(db: Session, title_id: int, data: AdjustmentCreate) -> Tit
         raise ValueError("Title not found")
     if data.type not in ("increase", "discount"):
         raise ValueError("Invalid adjustment type")
-    adj = TitleAdjustment(title_id=title_id, type=data.type, amount=float(data.amount), reason=data.reason)
+    adj = TitleAdjustment(title_id=title_id, type=data.type, amount=money(data.amount), reason=data.reason)
     db.add(adj)
     db.commit()
     db.refresh(adj)
     return adj
 
 
-def calculate_title_effective_amount(db: Session, title_id: int) -> float:
+def calculate_title_effective_amount(db: Session, title_id: int) -> Decimal:
     t = db.query(Title).filter(Title.id == title_id).first()
     if not t:
         raise ValueError("Title not found")
-    base = float(t.amount)
-    inc = sum(float(a.amount) for a in db.query(TitleAdjustment).filter(TitleAdjustment.title_id == title_id, TitleAdjustment.type == "increase").all())
-    disc = sum(float(a.amount) for a in db.query(TitleAdjustment).filter(TitleAdjustment.title_id == title_id, TitleAdjustment.type == "discount").all())
-    return max(0.0, base + inc - disc)
+    base = money(t.amount)
+    inc = sum((money(a.amount) for a in db.query(TitleAdjustment).filter(TitleAdjustment.title_id == title_id, TitleAdjustment.type == "increase").all()), Decimal("0.00"))
+    disc = sum((money(a.amount) for a in db.query(TitleAdjustment).filter(TitleAdjustment.title_id == title_id, TitleAdjustment.type == "discount").all()), Decimal("0.00"))
+    return max(Decimal("0.00"), money(base + inc - disc))
 
 
 def create_titles_batch(db: Session, data: BatchTitleCreate) -> BatchTitleOut:
@@ -405,7 +411,7 @@ def create_titles_batch(db: Session, data: BatchTitleCreate) -> BatchTitleOut:
                 if not plan:
                     errors.append({"contract_id": contract_id, "error": "Plan not found"})
                     continue
-                title_amount = float(plan.price)
+                title_amount = money(plan.price)
 
             # Gerar números de documento e nosso número
             doc_number = f"{contract_id}{data.issue_date.strftime('%Y%m%d')}"
@@ -416,7 +422,7 @@ def create_titles_batch(db: Session, data: BatchTitleCreate) -> BatchTitleOut:
                 contract_id=contract_id,
                 issue_date=data.issue_date,
                 due_date=data.due_date,
-                amount=title_amount,
+                amount=money(title_amount),
                 status=data.status,
                 fine_percent=data.fine_percent,
                 interest_percent=data.interest_percent,

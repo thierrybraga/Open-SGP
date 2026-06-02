@@ -9,7 +9,7 @@ Integrações:
 - modules.* modelos
 """
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 from .config import settings
@@ -142,6 +142,11 @@ def import_all_models() -> None:
         from ..modules.administration.backups import models as _backups
         from ..modules.administration.finance import models as _finance
         from ..modules.administration.setup import models as _setup
+        from ..modules.administration.email_config import models as _email_config
+        from ..modules.administration.email_servers import models as _email_servers
+        from ..modules.administration.employees import models as _employees
+        from ..modules.administration.operation_points import models as _operation_points
+        from ..modules.administration.payment_gateways import models as _payment_gateways
     except Exception:
         pass
     try:
@@ -152,32 +157,10 @@ def import_all_models() -> None:
 
 def ensure_required_columns() -> None:
     """
-    Executa verificações rápidas de esquema e aplica correções mínimas
-    para campos críticos ausentes que impedem a inicialização do painel.
+    Deprecated compatibility hook.
+
+    Schema changes are managed exclusively through Alembic migrations. Runtime
+    ALTER TABLE statements make startup non-deterministic and can hide failed
+    migrations, so this function intentionally does nothing.
     """
-    try:
-        with engine.connect() as conn:
-            # support_tickets.sla_due_at
-            cols_res = conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='support_tickets'")
-            )
-            cols = [row[0] for row in cols_res.fetchall()]
-            if "sla_due_at" not in cols:
-                conn.execute(text("ALTER TABLE support_tickets ADD COLUMN sla_due_at TIMESTAMP NULL"))
-                conn.commit()
-
-            # network_devices.zabbix_monitored / zabbix_host_id
-            nd_cols_res = conn.execute(
-                text("SELECT column_name FROM information_schema.columns WHERE table_name='network_devices'")
-            )
-            nd_cols = [row[0] for row in nd_cols_res.fetchall()]
-            if "zabbix_monitored" not in nd_cols:
-                conn.execute(text("ALTER TABLE network_devices ADD COLUMN zabbix_monitored BOOLEAN DEFAULT FALSE"))
-                conn.commit()
-            if "zabbix_host_id" not in nd_cols:
-                conn.execute(text("ALTER TABLE network_devices ADD COLUMN zabbix_host_id VARCHAR(20) NULL"))
-                conn.commit()
-
-    except Exception as e:
-        # Log não fatal: se falhar, o painel pode continuar, mas a dashboard pode quebrar
-        print(f"Schema check warning: {e}")
+    return None

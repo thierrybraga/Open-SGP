@@ -276,8 +276,7 @@
           variant: 'success',
           handler: function(row) {
               if(row.status !== 'closed') {
-                  // Redirect to close endpoint or handle via fetch
-                  window.location.href = `/admin/support/occurrences/close/${row.id}`;
+                  window.postAction(`/admin/support/occurrences/close/${row.id}`);
               }
           }
         }

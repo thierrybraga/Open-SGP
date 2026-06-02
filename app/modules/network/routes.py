@@ -52,7 +52,11 @@ from .service import (
 router = APIRouter()
 
 
-@router.get("/devices", response_model=List[DeviceOut])
+def _unsupported_vendor_error(error: NotImplementedError) -> HTTPException:
+    return HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail=str(error))
+
+
+@router.get("/devices", response_model=List[DeviceOut], dependencies=[Depends(require_permissions("network.read"))])
 def list_devices(db: Session = Depends(get_db)):
     items = db.query(NetworkDevice).all()
     return [DeviceOut(**d.__dict__) for d in items]
@@ -64,7 +68,7 @@ def create_device_endpoint(data: DeviceCreate, db: Session = Depends(get_db)):
     return DeviceOut(**d.__dict__)
 
 
-@router.get("/vlans", response_model=List[VLANOut])
+@router.get("/vlans", response_model=List[VLANOut], dependencies=[Depends(require_permissions("network.read"))])
 def list_vlans(db: Session = Depends(get_db)):
     items = db.query(VLAN).all()
     return [VLANOut(**v.__dict__) for v in items]
@@ -76,7 +80,7 @@ def create_vlan_endpoint(data: VLANCreate, db: Session = Depends(get_db)):
     return VLANOut(**v.__dict__)
 
 
-@router.get("/pools", response_model=List[IPPoolOut])
+@router.get("/pools", response_model=List[IPPoolOut], dependencies=[Depends(require_permissions("network.read"))])
 def list_pools(db: Session = Depends(get_db)):
     items = db.query(IPPool).all()
     return [IPPoolOut(**p.__dict__) for p in items]
@@ -88,7 +92,7 @@ def create_pool_endpoint(data: IPPoolCreate, db: Session = Depends(get_db)):
     return IPPoolOut(**p.__dict__)
 
 
-@router.get("/profiles", response_model=List[ServiceProfileOut])
+@router.get("/profiles", response_model=List[ServiceProfileOut], dependencies=[Depends(require_permissions("network.read"))])
 def list_profiles(db: Session = Depends(get_db)):
     items = db.query(ServiceProfile).all()
     return [ServiceProfileOut(**s.__dict__) for s in items]
@@ -100,7 +104,7 @@ def create_profile_endpoint(data: ServiceProfileCreate, db: Session = Depends(ge
     return ServiceProfileOut(**s.__dict__)
 
 
-@router.get("/assignments", response_model=List[AssignmentOut])
+@router.get("/assignments", response_model=List[AssignmentOut], dependencies=[Depends(require_permissions("network.read"))])
 def list_assignments(contract_id: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(ContractNetworkAssignment)
     if contract_id:
@@ -111,7 +115,10 @@ def list_assignments(contract_id: Optional[int] = None, db: Session = Depends(ge
 
 @router.post("/assignments", response_model=AssignmentOut, dependencies=[Depends(require_permissions("network.assignments.create"))])
 def create_assignment_endpoint(data: AssignmentCreate, db: Session = Depends(get_db)):
-    a = create_assignment(db, data)
+    try:
+        a = create_assignment(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return AssignmentOut(**a.__dict__)
 
 
@@ -121,6 +128,8 @@ def provision_contract_endpoint(contract_id: int, db: Session = Depends(get_db))
         a = provision_contract(db, contract_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except NotImplementedError as e:
+        raise _unsupported_vendor_error(e)
     return AssignmentOut(**a.__dict__)
 
 
@@ -130,6 +139,8 @@ def block_contract_endpoint(contract_id: int, db: Session = Depends(get_db)):
         a = block_contract(db, contract_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except NotImplementedError as e:
+        raise _unsupported_vendor_error(e)
     return AssignmentOut(**a.__dict__)
 
 
@@ -139,10 +150,12 @@ def unblock_contract_endpoint(contract_id: int, db: Session = Depends(get_db)):
         a = unblock_contract(db, contract_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except NotImplementedError as e:
+        raise _unsupported_vendor_error(e)
     return AssignmentOut(**a.__dict__)
 
 
-@router.get("/tech-history/{contract_id}")
+@router.get("/tech-history/{contract_id}", dependencies=[Depends(require_permissions("network.read"))])
 def tech_history(contract_id: int, db: Session = Depends(get_db)):
     items = db.query(ContractTechHistory).filter(ContractTechHistory.contract_id == contract_id).all()
     return [
@@ -159,7 +172,12 @@ def tech_history(contract_id: int, db: Session = Depends(get_db)):
 
 @router.post("/sync-billing/{contract_id}", response_model=AssignmentOut, dependencies=[Depends(require_permissions("network.sync_billing"))])
 def sync_billing(contract_id: int, db: Session = Depends(get_db)):
-    a = sync_billing_blocking(db, contract_id)
+    try:
+        a = sync_billing_blocking(db, contract_id)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except NotImplementedError as e:
+        raise _unsupported_vendor_error(e)
     return AssignmentOut(**a.__dict__)
 
 
@@ -189,13 +207,15 @@ def release_ip(contract_id: int, db: Session = Depends(get_db)):
     return {"contract_id": contract_id, "released": bool(lease), "ip": lease.ip_address if lease else None}
 
 
-@router.get("/olt/{device_id}/onu/{onu_id}/status")
+@router.get("/olt/{device_id}/onu/{onu_id}/status", dependencies=[Depends(require_permissions("network.read"))])
 def onu_status(device_id: int, onu_id: str, db: Session = Depends(get_db)):
     try:
-        status = get_onu_status(db, device_id, onu_id)
-        return status
+        onu = get_onu_status(db, device_id, onu_id)
+        return onu
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except NotImplementedError as e:
+        raise _unsupported_vendor_error(e)
 
 
 @router.post("/assignments/{contract_id}/unbind-vlan", dependencies=[Depends(require_permissions("network.assignments.update"))])
@@ -205,13 +225,15 @@ def unbind_vlan(contract_id: int, db: Session = Depends(get_db)):
         return AssignmentOut(**a.__dict__)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except NotImplementedError as e:
+        raise _unsupported_vendor_error(e)
 
 
-@router.get("/radius/session/{username}", response_model=Optional[RadiusSessionOut])
+@router.get("/radius/session/{username}", response_model=Optional[RadiusSessionOut], dependencies=[Depends(require_permissions("network.read"))])
 def radius_session(username: str, db: Session = Depends(get_db)):
     return get_radius_active_session(db, username)
 
 
-@router.get("/radius/history/{username}", response_model=List[RadiusUsageHistory])
+@router.get("/radius/history/{username}", response_model=List[RadiusUsageHistory], dependencies=[Depends(require_permissions("network.read"))])
 def radius_history(username: str, db: Session = Depends(get_db)):
     return get_radius_usage_history(db, username)

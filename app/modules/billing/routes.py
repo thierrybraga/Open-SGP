@@ -11,6 +11,7 @@ Integrações:
 
 from typing import List, Optional
 from datetime import date
+from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
@@ -63,7 +64,7 @@ from .service import (
 router = APIRouter()
 
 
-@router.get("/titles", response_model=List[TitleOut])
+@router.get("/titles", response_model=List[TitleOut], dependencies=[Depends(require_permissions("billing.titles.read"))])
 def list_titles(
     status_: Optional[str] = Query(default=None, alias="status"),
     contract_id: Optional[int] = Query(default=None),
@@ -116,7 +117,7 @@ def generate_boleto_endpoint(title_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/titles/{title_id}/pay", response_model=TitleOut, dependencies=[Depends(require_permissions("billing.titles.update"))])
-def pay_title_endpoint(title_id: int, amount: float, method: str = "boleto", db: Session = Depends(get_db)):
+def pay_title_endpoint(title_id: int, amount: Decimal, method: str = "boleto", db: Session = Depends(get_db)):
     t = db.query(Title).filter(Title.id == title_id).first()
     if not t:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Title not found")
@@ -151,7 +152,7 @@ def generate_remittance_file_endpoint(
     return RemittanceFileOut(content=content)
 
 
-@router.get("/promises", response_model=List[PaymentPromiseOut])
+@router.get("/promises", response_model=List[PaymentPromiseOut], dependencies=[Depends(require_permissions("billing.promises.read"))])
 def list_promises(client_id: Optional[int] = None, contract_id: Optional[int] = None, db: Session = Depends(get_db)):
     q = db.query(PaymentPromise)
     if client_id:
@@ -177,7 +178,7 @@ def generate_carne_endpoint(data: CarneCreate, db: Session = Depends(get_db)):
     return res
 
 
-@router.get("/titles/{title_id}/adjustments", response_model=List[AdjustmentOut])
+@router.get("/titles/{title_id}/adjustments", response_model=List[AdjustmentOut], dependencies=[Depends(require_permissions("billing.titles.read"))])
 def list_adjustments(title_id: int, db: Session = Depends(get_db)):
     items = db.query(TitleAdjustment).filter(TitleAdjustment.title_id == title_id).all()
     return [AdjustmentOut(**a.__dict__) for a in items]
@@ -196,13 +197,13 @@ def create_adjustment_endpoint(title_id: int, data: AdjustmentCreate, db: Sessio
     return AdjustmentOut(**a.__dict__)
 
 
-@router.get("/titles/{title_id}/effective-amount")
+@router.get("/titles/{title_id}/effective-amount", dependencies=[Depends(require_permissions("billing.titles.read"))])
 def get_effective_amount(title_id: int, db: Session = Depends(get_db)):
     try:
         val = calculate_title_effective_amount(db, title_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    return {"title_id": title_id, "effective_amount": val}
+    return {"title_id": title_id, "effective_amount": str(val)}
 
 
 @router.post("/titles/batch", response_model=BatchTitleOut, dependencies=[Depends(require_permissions("billing.titles.create"))])
@@ -237,7 +238,7 @@ def generate_boletos_batch_endpoint(data: BatchBoletoGenerate, db: Session = Dep
 
 # ===== PDF GENERATION =====
 
-@router.get("/carne/{contract_id}/pdf")
+@router.get("/carne/{contract_id}/pdf", dependencies=[Depends(require_permissions("billing.titles.read"))])
 def download_carne_pdf(
     contract_id: int,
     db: Session = Depends(get_db)
@@ -275,7 +276,7 @@ def download_carne_pdf(
     )
 
 
-@router.post("/carne/batch/pdf")
+@router.post("/carne/batch/pdf", dependencies=[Depends(require_permissions("billing.titles.read"))])
 def download_batch_carne_pdf(
     contract_ids: List[int],
     db: Session = Depends(get_db)
@@ -317,7 +318,7 @@ def download_batch_carne_pdf(
     )
 
 
-@router.get("/boleto/{title_id}/pdf")
+@router.get("/boleto/{title_id}/pdf", dependencies=[Depends(require_permissions("billing.titles.read"))])
 def download_boleto_pdf(
     title_id: int,
     db: Session = Depends(get_db)

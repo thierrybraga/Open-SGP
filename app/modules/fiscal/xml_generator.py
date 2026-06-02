@@ -115,10 +115,10 @@ class NFeXMLGenerator:
         # Converte para string
         xml_string = etree.tostring(
             root,
-            encoding='unicode',
+            encoding='utf-8',
             pretty_print=True,
             xml_declaration=True
-        )
+        ).decode("utf-8")
 
         return xml_string
 

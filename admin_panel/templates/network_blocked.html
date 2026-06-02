@@ -129,7 +129,7 @@
       
       window.unblockContract = (row) => {
         ISP_ERP.confirm(`Desbloquear contrato ${row.contract_id}?`, (c) => { 
-          if(c) window.location.href = `/network/unblock/${row.contract_id}`; 
+          if(c) window.postAction(`/network/unblock/${row.contract_id}`); 
         });
       };
     });

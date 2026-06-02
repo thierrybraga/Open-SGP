@@ -159,7 +159,7 @@
         ],
         data: sampleData,
         actions: [
-          { name: 'run', label: 'Executar', icon: '▶️', handler: (row) => window.location.href = `/admin/backups/run/${row.id}` },
+          { name: 'run', label: 'Executar', icon: '▶️', handler: (row) => window.postAction(`/admin/backups/run/${row.id}`) },
           { name: 'edit', label: 'Editar', icon: '✏️', handler: (row) => editBackup(row) },
           { name: 'delete', label: 'Excluir', icon: '🗑️', variant: 'danger', handler: (row) => deleteBackup(row) }
         ],

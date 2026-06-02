@@ -37,6 +37,10 @@ def create_contract(db: Session, data: ContractCreate) -> Contract:
 def update_contract(db: Session, contract: Contract, data: ContractUpdate) -> Contract:
     if data.end_date and contract.start_date and data.end_date < contract.start_date:
         raise ValueError("end_date must be >= start_date")
+    if data.plan_id is not None:
+        plan = db.query(Plan).filter(Plan.id == data.plan_id).first()
+        if not plan or not plan.is_active:
+            raise ValueError("Invalid or inactive plan")
     for field, value in data.dict(exclude_none=True).items():
         setattr(contract, field, value)
     db.add(contract)

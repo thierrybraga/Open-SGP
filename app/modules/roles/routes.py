@@ -22,7 +22,7 @@ from .service import create_role
 router = APIRouter()
 
 
-@router.get("/", response_model=List[RoleOut])
+@router.get("/", response_model=List[RoleOut], dependencies=[Depends(require_permissions("roles.read"))])
 def list_roles(db: Session = Depends(get_db)):
     roles = db.query(Role).all()
     return [RoleOut(id=r.id, name=r.name, permissions=[p.code for p in r.permissions]) for r in roles]

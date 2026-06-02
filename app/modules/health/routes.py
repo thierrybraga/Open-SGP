@@ -5,7 +5,9 @@ Responsabilidade:
 Endpoints de health check para monitoramento e readiness.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse, PlainTextResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.config import settings
@@ -45,7 +47,7 @@ def readiness_check(db: Session = Depends(get_db)):
     # Check database
     try:
         start = time.time()
-        db.execute("SELECT 1")
+        db.execute(text("SELECT 1"))
         elapsed = time.time() - start
         checks["database"] = {
             "status": "healthy",
@@ -91,13 +93,12 @@ def readiness_check(db: Session = Depends(get_db)):
     if config_issues and settings.is_production():
         all_healthy = False
 
-    status_code = 200 if all_healthy else 503
-
-    return {
+    payload = {
         "status": "ready" if all_healthy else "not_ready",
         "timestamp": datetime.utcnow().isoformat(),
         "checks": checks
     }
+    return JSONResponse(status_code=200 if all_healthy else 503, content=payload)
 
 
 @router.get("/liveness")
@@ -115,14 +116,26 @@ def liveness_check():
 @router.get("/metrics")
 def metrics():
     """
-    Métricas básicas do sistema.
-    Pode ser expandido para formato Prometheus.
+    Métricas básicas em formato Prometheus text exposition.
     """
     import psutil
 
-    return {
-        "timestamp": datetime.utcnow().isoformat(),
-        "cpu_percent": psutil.cpu_percent(interval=0.1),
-        "memory_percent": psutil.virtual_memory().percent,
-        "disk_percent": psutil.disk_usage('/').percent
-    }
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory_percent = psutil.virtual_memory().percent
+    disk_percent = psutil.disk_usage('/').percent
+
+    content = "\n".join(
+        [
+            "# HELP open_sgp_cpu_percent Current CPU usage percentage",
+            "# TYPE open_sgp_cpu_percent gauge",
+            f"open_sgp_cpu_percent {cpu_percent}",
+            "# HELP open_sgp_memory_percent Current memory usage percentage",
+            "# TYPE open_sgp_memory_percent gauge",
+            f"open_sgp_memory_percent {memory_percent}",
+            "# HELP open_sgp_disk_percent Current disk usage percentage",
+            "# TYPE open_sgp_disk_percent gauge",
+            f"open_sgp_disk_percent {disk_percent}",
+            "",
+        ]
+    )
+    return PlainTextResponse(content=content, media_type="text/plain; version=0.0.4")

@@ -49,27 +49,19 @@ class OLTClient:
         return {"vendor": self.vendor, "status": "Unreachable"}
 
     def provision_vlan(self, onu_id: str, vlan_id: int):
-        return True
+        raise NotImplementedError(f"Provisionamento VLAN para OLT {self.vendor} requer adapter específico do fabricante")
 
     def set_service_profile(self, onu_id: str, download_mbps: float, upload_mbps: float):
-        return True
+        raise NotImplementedError(f"Perfil de serviço para OLT {self.vendor} requer adapter específico do fabricante")
 
     def remove_service_profile(self, onu_id: str):
-        return True
+        raise NotImplementedError(f"Remoção de perfil para OLT {self.vendor} requer adapter específico do fabricante")
 
     def bind_vlan(self, onu_id: str, vlan_id: int):
-        return True
+        raise NotImplementedError(f"Bind de VLAN para OLT {self.vendor} requer adapter específico do fabricante")
 
     def unbind_vlan(self, onu_id: str, vlan_id: int):
-        return True
+        raise NotImplementedError(f"Unbind de VLAN para OLT {self.vendor} requer adapter específico do fabricante")
 
     def onu_status(self, onu_id: str) -> dict:
-        return {
-            "onu_id": onu_id,
-            "vendor": self.vendor,
-            "online": True,
-            "rx_power_dbm": -19.5,
-            "tx_power_dbm": 2.0,
-            "uptime_seconds": 86400,
-            "last_flap": None,
-        }
+        raise NotImplementedError(f"Consulta de ONU para OLT {self.vendor} requer adapter específico do fabricante")

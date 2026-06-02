@@ -22,7 +22,7 @@ from .service import create_config, create_charge, update_charge_status
 router = APIRouter()
 
 
-@router.get("/configs", response_model=List[GatewayConfigOut])
+@router.get("/configs", response_model=List[GatewayConfigOut], dependencies=[Depends(require_permissions("billing.gateway.read"))])
 def list_configs(db: Session = Depends(get_db)):
     items = db.query(PaymentGatewayConfig).all()
     return [GatewayConfigOut(**i.__dict__) for i in items]
@@ -38,7 +38,7 @@ def create_config_endpoint(data: GatewayConfigCreate, db: Session = Depends(get_
     return GatewayConfigOut(**cfg.__dict__)
 
 
-@router.get("/charges", response_model=List[ChargeOut])
+@router.get("/charges", response_model=List[ChargeOut], dependencies=[Depends(require_permissions("billing.gateway.read"))])
 def list_charges(status_: Optional[str] = None, db: Session = Depends(get_db)):
     q = db.query(PaymentCharge)
     if status_:

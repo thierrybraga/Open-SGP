@@ -16,6 +16,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from ...core.config import settings
 from ...core.dependencies import get_db, get_current_user
 from ...core.security import verify_password, create_access_token, blacklist_token, get_token_from_header
 from ..users.models import User
@@ -38,6 +39,8 @@ def register(request: Request, data: UserCreate, db: Session = Depends(get_db)):
 
     Rate limit: 5 tentativas por minuto por IP.
     """
+    if not settings.public_registration_enabled:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Public registration is disabled")
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
     user = create_user(db, data)

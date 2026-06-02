@@ -80,8 +80,46 @@ def create_profile(db: Session, data: ServiceProfileCreate) -> ServiceProfile:
     return prof
 
 
+def plan_profile_name(plan_id: int) -> str:
+    return f"plan:{plan_id}"
+
+
+def sync_service_profile_for_plan(db: Session, plan) -> ServiceProfile:
+    """
+    Keep the technical shaper profile aligned with the commercial plan.
+    """
+    profile = db.query(ServiceProfile).filter(ServiceProfile.name == plan_profile_name(plan.id)).first()
+    if not profile:
+        profile = ServiceProfile(name=plan_profile_name(plan.id))
+        db.add(profile)
+
+    profile.download_speed_mbps = plan.download_speed_mbps
+    profile.upload_speed_mbps = plan.upload_speed_mbps
+    profile.burst_enabled = plan.burst_enabled
+    profile.burst_rate_percent = plan.burst_rate_percent
+    profile.burst_threshold_seconds = plan.burst_threshold_seconds
+    db.commit()
+    db.refresh(profile)
+
+    RadiusClient(db).create_plan_template(
+        profile.name,
+        download_mbps=profile.download_speed_mbps,
+        upload_mbps=profile.upload_speed_mbps,
+    )
+    return profile
+
+
 def create_assignment(db: Session, data: AssignmentCreate) -> ContractNetworkAssignment:
-    cna = ContractNetworkAssignment(**data.dict())
+    values = data.dict()
+    contract = db.query(Contract).filter(Contract.id == data.contract_id).first()
+    if not contract:
+        raise ValueError("Contract not found")
+
+    if not values.get("profile_id") and contract.plan:
+        profile = sync_service_profile_for_plan(db, contract.plan)
+        values["profile_id"] = profile.id
+
+    cna = ContractNetworkAssignment(**values)
     db.add(cna)
     db.commit()
     db.refresh(cna)
@@ -100,7 +138,7 @@ def _vendor_clients(device: NetworkDevice):
     if device.vendor in ("huawei", "zte"):
         return OLTClient(device.host, device.username, device.password, vendor=device.vendor)
     if device.vendor == "vsol":
-        return VSOLClient(device.host, device.username, device.password)
+        return VSOLClient(device.host, device.username, device.password, port=device.port or 23)
     return None
 
 
@@ -133,6 +171,11 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
     if dev:
         client = _vendor_clients(dev)
     prof = cna.profile
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if not prof and contract and contract.plan:
+        prof = sync_service_profile_for_plan(db, contract.plan)
+        cna.profile_id = prof.id
+        cna.profile = prof
     # Dynamic IP allocation
     if cna.ip_pool and cna.ip_pool.type == "dynamic" and not cna.static_ip:
         lease = db.query(IPLease).filter(IPLease.contract_id == contract_id, IPLease.status == "allocated").first()
@@ -144,7 +187,10 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
         if dev.vendor == "mikrotik":
             mk = MikrotikClient(dev.host, dev.port, dev.username, dev.password)
             mk.provision_simple_queue(
-                name=str(contract_id), max_down_mbps=prof.download_speed_mbps, max_up_mbps=prof.upload_speed_mbps
+                name=str(contract_id),
+                max_down_mbps=prof.download_speed_mbps,
+                max_up_mbps=prof.upload_speed_mbps,
+                target_ip=cna.static_ip,
             )
             if cna.static_ip:
                 mk.set_static_ip(name=str(contract_id), ip=cna.static_ip)
@@ -152,17 +198,14 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
                 mk.enable_cgnat(name=str(contract_id))
         elif dev.vendor in ("huawei", "zte", "vsol"):
             if dev.vendor == "vsol":
-                olt = VSOLClient(dev.host, dev.username, dev.password)
+                olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
             else:
                 olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
             olt.set_service_profile(
                 onu_id=str(contract_id), download_mbps=prof.download_speed_mbps, upload_mbps=prof.upload_speed_mbps
             )
             if cna.vlan:
-                try:
-                    olt.provision_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
-                except Exception:
-                    pass
+                olt.provision_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
         elif dev.type == "bras":
             # Use specific credentials if available, otherwise fallback to contract_id
             u_user = cna.pppoe_user if cna.pppoe_user else str(contract_id)
@@ -171,6 +214,7 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
             RadiusClient(db).create_or_update_user(
                 username=u_user,
                 password=u_pass,
+                plan_group_name=prof.name,
                 download_mbps=prof.download_speed_mbps,
                 upload_mbps=prof.upload_speed_mbps,
                 burst_enabled=prof.burst_enabled,
@@ -197,23 +241,22 @@ def block_contract(db: Session, contract_id: int) -> ContractNetworkAssignment:
             MikrotikClient(dev.host, dev.port, dev.username, dev.password).block_client(str(contract_id))
             _write_history(db, contract_id, "block", "Mikrotik: cliente bloqueado")
         elif dev.vendor in ("huawei", "zte", "vsol"):
-            try:
-                if dev.vendor == "vsol":
-                    olt = VSOLClient(dev.host, dev.username, dev.password)
-                else:
-                    olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
-                olt.remove_service_profile(onu_id=str(contract_id))
-                if cna.vlan:
-                    try:
-                        olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
-                    except Exception:
-                        pass
-                _write_history(db, contract_id, "block", f"OLT {dev.vendor}: perfil removido")
-            except Exception:
-                pass
+            if dev.vendor == "vsol":
+                olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
+            else:
+                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+            olt.remove_service_profile(onu_id=str(contract_id))
+            if cna.vlan:
+                olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
+            _write_history(db, contract_id, "block", f"OLT {dev.vendor}: perfil removido")
         elif dev.type == "bras":
-            RadiusClient(db).block_user(str(contract_id))
+            username = cna.pppoe_user if cna.pppoe_user else str(contract_id)
+            RadiusClient(db).block_user(username)
     cna.status = "blocked"
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if contract and contract.status != "canceled":
+        contract.status = "suspended"
+        db.add(contract)
     db.add(cna)
     db.commit()
     db.refresh(cna)
@@ -229,13 +272,14 @@ def get_onu_status(db: Session, device_id: int, onu_id: str) -> dict:
         raise ValueError("Device is not an OLT")
     
     if dev.vendor == "vsol":
-        olt = VSOLClient(dev.host, dev.username, dev.password)
+        olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
     else:
         olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
         
-    status = olt.onu_status(onu_id=str(onu_id))
-    _write_history(db, int(onu_id), "onu_status", f"OLT {dev.vendor}: status consultado")
-    return status
+    onu = olt.onu_status(onu_id=str(onu_id))
+    if str(onu_id).isdigit():
+        _write_history(db, int(onu_id), "onu_status", f"OLT {dev.vendor}: status consultado")
+    return onu
 
 
 def unbind_vlan_for_contract(db: Session, contract_id: int) -> ContractNetworkAssignment:
@@ -244,15 +288,12 @@ def unbind_vlan_for_contract(db: Session, contract_id: int) -> ContractNetworkAs
         raise ValueError("Assignment not found")
     dev = cna.device
     if dev and cna.vlan and dev.vendor in ("huawei", "zte", "vsol"):
-        try:
-            if dev.vendor == "vsol":
-                olt = VSOLClient(dev.host, dev.username, dev.password)
-            else:
-                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
-            olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
-            _write_history(db, contract_id, "unbind_vlan", f"OLT {dev.vendor}: VLAN {cna.vlan.vlan_id} desassociada")
-        except Exception:
-            pass
+        if dev.vendor == "vsol":
+            olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
+        else:
+            olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+        olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
+        _write_history(db, contract_id, "unbind_vlan", f"OLT {dev.vendor}: VLAN {cna.vlan.vlan_id} desassociada")
     db.refresh(cna)
     return cna
 
@@ -268,22 +309,24 @@ def unblock_contract(db: Session, contract_id: int) -> ContractNetworkAssignment
             MikrotikClient(dev.host, dev.port, dev.username, dev.password).unblock_client(str(contract_id))
             _write_history(db, contract_id, "unblock", "Mikrotik: cliente desbloqueado")
         elif dev.vendor in ("huawei", "zte", "vsol"):
-            try:
-                if dev.vendor == "vsol":
-                    olt = VSOLClient(dev.host, dev.username, dev.password)
-                else:
-                    olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
-                prof = cna.profile
-                if prof:
-                    olt.set_service_profile(onu_id=str(contract_id), download_mbps=prof.download_speed_mbps, upload_mbps=prof.upload_speed_mbps)
-                if cna.vlan:
-                    olt.bind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
-                _write_history(db, contract_id, "unblock", f"OLT {dev.vendor}: perfil/vlan aplicados")
-            except Exception:
-                pass
+            if dev.vendor == "vsol":
+                olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
+            else:
+                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+            prof = cna.profile
+            if prof:
+                olt.set_service_profile(onu_id=str(contract_id), download_mbps=prof.download_speed_mbps, upload_mbps=prof.upload_speed_mbps)
+            if cna.vlan:
+                olt.bind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
+            _write_history(db, contract_id, "unblock", f"OLT {dev.vendor}: perfil/vlan aplicados")
         elif dev.type == "bras":
-            RadiusClient(db).unblock_user(str(contract_id))
+            username = cna.pppoe_user if cna.pppoe_user else str(contract_id)
+            RadiusClient(db).unblock_user(username)
     cna.status = "active"
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if contract and contract.status == "suspended":
+        contract.status = "active"
+        db.add(contract)
     db.add(cna)
     db.commit()
     db.refresh(cna)
@@ -295,6 +338,9 @@ def sync_billing_blocking(db: Session, contract_id: int) -> ContractNetworkAssig
     from datetime import date as _date
     from sqlalchemy import or_, and_
     today = _date.today()
+    contract = db.query(Contract).filter(Contract.id == contract_id).first()
+    if contract and not contract.suspend_on_arrears:
+        return unblock_contract(db, contract_id)
     overdue_count = (
         db.query(Title)
         .filter(Title.contract_id == contract_id)

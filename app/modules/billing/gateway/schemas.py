@@ -8,6 +8,7 @@ Integrações:
 - modules.billing.gateway.models
 """
 
+from decimal import Decimal
 from typing import Optional
 from pydantic import BaseModel
 
@@ -38,7 +39,7 @@ class ChargeOut(BaseModel):
     gateway_id: Optional[int]
     status: str
     reference: str
-    amount: float
+    amount: Decimal
     payment_url: Optional[str]
 
     class Config:

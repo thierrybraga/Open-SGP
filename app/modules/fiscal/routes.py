@@ -74,7 +74,13 @@ def issue_invoice_endpoint(invoice_id: int, payload: InvoiceIssue, db: Session =
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
-    inv = issue_invoice(db, inv, payload)
+    try:
+        inv = issue_invoice(db, inv, payload)
+        db.add(inv)
+        db.commit()
+        db.refresh(inv)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return InvoiceOut(**inv.__dict__)
 
 
@@ -109,10 +115,13 @@ def sign_a1_endpoint(invoice_id: int, db: Session = Depends(get_db)):
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
-    inv = sign_invoice_a1(inv)
-    db.add(inv)
-    db.commit()
-    db.refresh(inv)
+    try:
+        inv = sign_invoice_a1(inv)
+        db.add(inv)
+        db.commit()
+        db.refresh(inv)
+    except (ValueError, RuntimeError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return InvoiceOut(**inv.__dict__)
 
 
@@ -121,10 +130,13 @@ def send_sefaz_endpoint(invoice_id: int, force: bool = False, db: Session = Depe
     inv = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not inv:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invoice not found")
-    inv = send_to_sefaz(inv, force=force)
-    db.add(inv)
-    db.commit()
-    db.refresh(inv)
+    try:
+        inv = send_to_sefaz(inv, force=force)
+        db.add(inv)
+        db.commit()
+        db.refresh(inv)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return InvoiceOut(**inv.__dict__)
 
 
@@ -136,7 +148,7 @@ def create_invoices_batch_endpoint(data: BatchInvoiceCreate, db: Session = Depen
     Cria notas fiscais em lote a partir de uma lista de títulos.
     """
     result = create_invoices_batch(db, data)
-    return BatchInvoiceResult(**result)
+    return result
 
 
 # ===== DEBIT NOTE =====

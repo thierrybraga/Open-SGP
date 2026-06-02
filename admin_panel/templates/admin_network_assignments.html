@@ -546,7 +546,7 @@
           `Deseja provisionar o contrato ${row.contract_id}?`,
           function(confirmed) {
             if (confirmed) {
-              window.location.href = `/admin/network/assignments/provision/${row.contract_id}`;
+              window.postAction(`/admin/network/assignments/provision/${row.contract_id}`);
             }
           }
         );
@@ -557,7 +557,7 @@
           `Deseja bloquear o contrato ${row.contract_id}?`,
           function(confirmed) {
             if (confirmed) {
-              window.location.href = `/admin/network/assignments/block/${row.contract_id}`;
+              window.postAction(`/admin/network/assignments/block/${row.contract_id}`);
             }
           }
         );
@@ -568,7 +568,7 @@
           `Deseja desbloquear o contrato ${row.contract_id}?`,
           function(confirmed) {
             if (confirmed) {
-              window.location.href = `/admin/network/assignments/unblock/${row.contract_id}`;
+              window.postAction(`/admin/network/assignments/unblock/${row.contract_id}`);
             }
           }
         );
@@ -579,7 +579,7 @@
           `Sincronizar bloqueio via financeiro para o contrato ${row.contract_id}?`,
           function(confirmed) {
             if (confirmed) {
-              window.location.href = `/admin/network/assignments/sync-billing/${row.contract_id}`;
+              window.postAction(`/admin/network/assignments/sync-billing/${row.contract_id}`);
             }
           }
         );

@@ -9,6 +9,7 @@ Integrações:
 """
 
 from datetime import date
+from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -17,7 +18,7 @@ class TitleCreate(BaseModel):
     contract_id: int
     issue_date: date
     due_date: date
-    amount: float
+    amount: Decimal
     status: str = "open"
     fine_percent: float = 2.0
     interest_percent: float = 1.0
@@ -28,7 +29,7 @@ class TitleCreate(BaseModel):
 
 class TitleUpdate(BaseModel):
     due_date: Optional[date] = None
-    amount: Optional[float] = None
+    amount: Optional[Decimal] = None
     status: Optional[str] = None
     fine_percent: Optional[float] = None
     interest_percent: Optional[float] = None
@@ -43,7 +44,7 @@ class TitleOut(BaseModel):
     issue_date: date
     due_date: date
     paid_date: Optional[date]
-    amount: float
+    amount: Decimal
     status: str
     fine_percent: float
     interest_percent: float
@@ -105,7 +106,7 @@ class PaymentPromiseCreate(BaseModel):
     contract_id: int
     title_id: Optional[int] = None
     promised_date: date
-    amount: float
+    amount: Decimal
     notes: Optional[str] = None
 
 
@@ -115,7 +116,7 @@ class PaymentPromiseOut(BaseModel):
     contract_id: int
     title_id: Optional[int]
     promised_date: date
-    amount: float
+    amount: Decimal
     status: str
     notes: Optional[str]
 
@@ -128,7 +129,7 @@ class CarneCreate(BaseModel):
     start_month: int  # 1-12
     start_year: int
     months: int
-    amount: Optional[float] = None
+    amount: Optional[Decimal] = None
 
 
 class CarneOut(BaseModel):
@@ -140,7 +141,7 @@ class CarneOut(BaseModel):
 
 class AdjustmentCreate(BaseModel):
     type: str  # "increase" or "discount"
-    amount: float
+    amount: Decimal
     reason: Optional[str] = None
 
 
@@ -148,7 +149,7 @@ class AdjustmentOut(BaseModel):
     id: int
     title_id: int
     type: str
-    amount: float
+    amount: Decimal
     reason: Optional[str]
 
     class Config:
@@ -159,7 +160,7 @@ class BatchTitleCreate(BaseModel):
     contract_ids: List[int]
     issue_date: date
     due_date: date
-    amount: Optional[float] = None  # Se None, usa valor do plano
+    amount: Optional[Decimal] = None  # Se None, usa valor do plano
     status: str = "open"
     fine_percent: float = 2.0
     interest_percent: float = 1.0
@@ -177,7 +178,7 @@ class BatchCarneCreate(BaseModel):
     start_month: int  # 1-12
     start_year: int
     months: int
-    amount: Optional[float] = None  # Se None, usa valor do plano
+    amount: Optional[Decimal] = None  # Se None, usa valor do plano
 
 
 class BatchCarneOut(BaseModel):

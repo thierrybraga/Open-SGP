@@ -23,7 +23,7 @@ from .service import create_contract, update_contract
 router = APIRouter()
 
 
-@router.get("/", response_model=List[ContractOut])
+@router.get("/", response_model=List[ContractOut], dependencies=[Depends(require_permissions("contracts.read"))])
 def list_contracts(
     client_id: Optional[int] = Query(default=None),
     plan_id: Optional[int] = Query(default=None),
@@ -68,7 +68,7 @@ def update_contract_endpoint(contract_id: int, data: ContractUpdate, db: Session
     return ContractOut(**c.__dict__)
 
 
-@router.get("/{contract_id}", response_model=ContractOut)
+@router.get("/{contract_id}", response_model=ContractOut, dependencies=[Depends(require_permissions("contracts.read"))])
 def get_contract(contract_id: int, db: Session = Depends(get_db)):
     c = db.query(Contract).filter(Contract.id == contract_id).first()
     if not c:

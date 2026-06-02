@@ -22,6 +22,7 @@ from .service import update_charge_status
 import hmac
 import hashlib
 from datetime import datetime
+from ....shared.money import money
 
 
 router = APIRouter()
@@ -79,13 +80,13 @@ async def webhook_provider(provider: str, request: Request, db: Session = Depend
         paid_at = None
         if provider_key == "asaas":
             pm = payload.get("payment") or {}
-            amount = float(pm.get("value", 0) or 0)
+            amount = money(pm.get("value", 0) or 0)
             method = (pm.get("billingType") or "boleto").lower()
             external_id = pm.get("id")
             paid_at = pm.get("paymentDate") or pm.get("clientPaymentDate")
         elif provider_key == "gerencianet":
             chg = payload.get("charge") or {}
-            amount = float(chg.get("value", 0) or 0)
+            amount = money(chg.get("value", 0) or 0)
             method = "boleto"
             external_id = chg.get("charge_id") or chg.get("id")
             paid_at = chg.get("paid_at")

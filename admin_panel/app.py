@@ -8,14 +8,14 @@ Integrações:
 - templates/index.html
 """
 
-from flask import Flask, render_template, request, redirect, url_for, make_response, session, flash
+from flask import Flask, abort, render_template, request, redirect, url_for, make_response, session, flash
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import create_engine, func, case
 import secrets
 import os
 
 from ..app.core.config import settings
-from ..app.core.database import import_all_models, SessionLocal, ensure_required_columns, Base, engine
+from ..app.core.database import import_all_models, SessionLocal, Base, engine
 from ..app.modules.communication.models import MessageQueue
 from ..app.modules.communication.service import requeue_failed, dispatch_message
 from ..app.modules.reports.service import dashboard_overview, timeseries_communication_success, timeseries_service_orders_status
@@ -69,25 +69,45 @@ from ..app.modules.billing.models import Title
 from ..app.core.security import verify_password, hash_password, create_access_token
 
 
+def authenticate_user(db: Session, username: str | None, password: str | None) -> User | None:
+    if not username or not password:
+        return None
+    user = db.query(User).filter(User.username == username).first()
+    if not user or not user.is_active:
+        return None
+    if not verify_password(password, user.hashed_password):
+        return None
+    return user
+
+
+def get_csrf_token() -> str:
+    token = session.get("csrf_token")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session["csrf_token"] = token
+    return token
+
+
+def validate_csrf_token() -> bool:
+    expected = session.get("csrf_token")
+    submitted = request.headers.get("X-CSRF-Token") or request.form.get("csrf_token")
+    return bool(expected and submitted and secrets.compare_digest(expected, submitted))
+
+
 def create_app() -> Flask:
     # Importar todos os modelos para garantir relacionamentos do SQLAlchemy
     import_all_models()
-    # Garantir colunas críticas para queries do painel
-    try:
-        ensure_required_columns()
-    except Exception:
-        pass
-
-    try:
-        Base.metadata.create_all(bind=engine)
-    except Exception:
-        pass
+    if settings.should_auto_create_tables():
+        try:
+            Base.metadata.create_all(bind=engine)
+        except Exception:
+            pass
 
     app = Flask(__name__)
 
     # Configure session
-    app.secret_key = getattr(settings, 'SECRET_KEY', secrets.token_hex(32))
-    app.config['SESSION_COOKIE_SECURE'] = False  # Set to True in production with HTTPS
+    app.secret_key = settings.secret_key or secrets.token_hex(32)
+    app.config['SESSION_COOKIE_SECURE'] = settings.is_production()
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
@@ -96,8 +116,23 @@ def create_app() -> Flask:
         return dict(
             current_user=session.get("user"),
             access_token=session.get("access_token"),
-            api_base_url=os.getenv("API_PUBLIC_URL", "http://localhost:8000")
+            api_base_url=os.getenv("API_PUBLIC_URL", "http://localhost:8000"),
+            csrf_token=get_csrf_token(),
         )
+
+    @app.before_request
+    def require_admin_session():
+        protected_prefixes = ("/admin", "/communication", "/network", "/api")
+        protected_endpoints = {"dashboard", "service_orders", "user_settings", "profile"}
+        if request.endpoint == "static" or request.path in {"/", "/login"}:
+            return None
+        if request.path.startswith(protected_prefixes) or request.endpoint in protected_endpoints:
+            if not session.get("authenticated"):
+                flash("Por favor, faça login para acessar esta página", "warning")
+                return redirect(url_for("login"))
+        if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not validate_csrf_token():
+            abort(400, description="Invalid CSRF token")
+        return None
 
     @app.route("/")
     def index():
@@ -111,27 +146,29 @@ def create_app() -> Flask:
             password = request.form.get("password")
             remember = request.form.get("remember") == "on"
 
-            # TODO: Implement real authentication against database
-            # For now, using simple validation for demo purposes
-            if username and password:
-                # In production, validate against User table with hashed password
-                # Example: user = db.query(User).filter(User.username == username).first()
-                # if user and verify_password(password, user.hashed_password):
-
-                # Simple demo validation (REPLACE IN PRODUCTION)
-                if username == "admin" and password == "admin123":
-                    session["user"] = username
-                    session["authenticated"] = True
-                    # Generate JWT token for API access
-                    # In a real scenario, we would use the user's ID
-                    session["access_token"] = create_access_token(subject=username)
-                    session.permanent = remember
-                    flash("Login realizado com sucesso!", "success")
-                    return redirect(url_for("dashboard"))
-                else:
-                    flash("Usuário ou senha inválidos", "error")
-            else:
+            if not username or not password:
                 flash("Por favor, preencha todos os campos", "error")
+                return render_template("login.html")
+
+            db = SessionLocal()
+            try:
+                user = authenticate_user(db, username, password)
+                if not user:
+                    flash("Usuário ou senha inválidos", "error")
+                    return render_template("login.html")
+
+                session["user"] = user.username
+                session["user_id"] = user.id
+                session["authenticated"] = True
+                session["access_token"] = create_access_token(
+                    subject=user.username,
+                    claims={"roles": [role.name for role in user.roles]},
+                )
+                session.permanent = remember
+                flash("Login realizado com sucesso!", "success")
+                return redirect(url_for("dashboard"))
+            finally:
+                db.close()
 
         return render_template("login.html")
 
@@ -1221,7 +1258,7 @@ def create_app() -> Flask:
             db.close()
 
 
-    @app.route("/admin/backups/run/<int:job_id>")
+    @app.route("/admin/backups/run/<int:job_id>", methods=["POST"])
     def admin_backups_run(job_id: int):
         db = SessionLocal()
         try:
@@ -1371,7 +1408,7 @@ def create_app() -> Flask:
             db.close()
         return render_template("admin_occurrence_edit.html", occurrence=occurrence, message=message, error=error)
 
-    @app.route("/admin/support/occurrences/close/<int:occurrence_id>")
+    @app.route("/admin/support/occurrences/close/<int:occurrence_id>", methods=["POST"])
     def admin_support_occurrence_close(occurrence_id: int):
         db = SessionLocal()
         try:
@@ -1387,7 +1424,7 @@ def create_app() -> Flask:
             db.close()
         return redirect(url_for("admin_support_occurrences", status="open"))
 
-    @app.route("/admin/support/occurrences/create-os/<int:occurrence_id>")
+    @app.route("/admin/support/occurrences/create-os/<int:occurrence_id>", methods=["POST"])
     def admin_support_occurrence_create_os(occurrence_id: int):
         db = SessionLocal()
         try:
@@ -1729,7 +1766,7 @@ def create_app() -> Flask:
         finally:
             db.close()
 
-    @app.route("/admin/network/assignments/provision/<int:contract_id>")
+    @app.route("/admin/network/assignments/provision/<int:contract_id>", methods=["POST"])
     def admin_network_assignments_provision(contract_id: int):
         db = SessionLocal()
         try:
@@ -1741,7 +1778,7 @@ def create_app() -> Flask:
             db.close()
         return redirect(url_for("admin_network_assignments"))
 
-    @app.route("/admin/network/assignments/block/<int:contract_id>")
+    @app.route("/admin/network/assignments/block/<int:contract_id>", methods=["POST"])
     def admin_network_assignments_block(contract_id: int):
         db = SessionLocal()
         try:
@@ -1753,7 +1790,7 @@ def create_app() -> Flask:
             db.close()
         return redirect(url_for("admin_network_assignments"))
 
-    @app.route("/admin/network/assignments/unblock/<int:contract_id>")
+    @app.route("/admin/network/assignments/unblock/<int:contract_id>", methods=["POST"])
     def admin_network_assignments_unblock(contract_id: int):
         db = SessionLocal()
         try:
@@ -1765,7 +1802,7 @@ def create_app() -> Flask:
             db.close()
         return redirect(url_for("admin_network_assignments"))
 
-    @app.route("/admin/network/assignments/sync-billing/<int:contract_id>")
+    @app.route("/admin/network/assignments/sync-billing/<int:contract_id>", methods=["POST"])
     def admin_network_assignments_sync_billing(contract_id: int):
         db = SessionLocal()
         try:
@@ -1839,7 +1876,7 @@ def create_app() -> Flask:
         finally:
             db.close()
 
-    @app.route("/network/unblock/<int:contract_id>")
+    @app.route("/network/unblock/<int:contract_id>", methods=["POST"])
     def network_unblock(contract_id: int):
         db = SessionLocal()
         try:
@@ -2500,7 +2537,7 @@ def create_app() -> Flask:
             db.close()
         return redirect(url_for("admin_support_ticket_detail", ticket_id=ticket_id))
 
-    @app.route("/admin/support/tickets/<int:ticket_id>/create-os")
+    @app.route("/admin/support/tickets/<int:ticket_id>/create-os", methods=["POST"])
     def admin_support_ticket_create_os(ticket_id: int):
         db = SessionLocal()
         try:
