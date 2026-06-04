@@ -13,6 +13,19 @@ from ..administration.setup.models import SetupProgress
 
 logger = logging.getLogger(__name__)
 
+
+DEFAULT_TEMPLATE_MAP = {
+    "mikrotik": ["Template Net Mikrotik SNMP"],
+    "huawei": ["Template Net Huawei GPON SNMP"],
+    "zte": ["Template Net ZTE GPON SNMP"],
+    "vsol": ["Template Net VSOL GPON SNMP"],
+    "router": ["Template Module ICMP Ping"],
+    "switch": ["Template Module ICMP Ping"],
+    "olt": ["Template Module ICMP Ping"],
+    "bras": ["Template Module ICMP Ping"],
+}
+
+
 def get_zabbix_client(db: Session) -> ZabbixClient | None:
     """
     Obtém cliente Zabbix configurado no setup.
@@ -62,9 +75,8 @@ def sync_device_to_zabbix(db: Session, device_id: int):
         group_id = client.create_host_group(group_name)
         
         # 2. Definir templates baseados no vendor
-        templates = []
-        # TODO: Mapear templates IDs baseados no nome (ex: "Template Mikrotik")
-        # Por enquanto, deixamos vazio ou fixo se soubermos os IDs
+        template_names = _template_names_for_device(config, device)
+        templates = client.get_template_ids_by_names(template_names)
         
         # 3. Criar/Atualizar Host
         host_id = client.create_host(
@@ -83,3 +95,15 @@ def sync_device_to_zabbix(db: Session, device_id: int):
         
     except Exception as e:
         logger.error(f"Failed to sync device {device.name} to Zabbix: {e}")
+
+
+def _template_names_for_device(config: dict, device: NetworkDevice) -> list[str]:
+    configured_map = config.get("template_map") or {}
+    vendor = (device.vendor or "").lower()
+    device_type = (device.type or "").lower()
+    names = configured_map.get(vendor) or configured_map.get(device_type)
+    if isinstance(names, str):
+        return [names]
+    if isinstance(names, list):
+        return [str(name) for name in names if name]
+    return DEFAULT_TEMPLATE_MAP.get(vendor) or DEFAULT_TEMPLATE_MAP.get(device_type) or []

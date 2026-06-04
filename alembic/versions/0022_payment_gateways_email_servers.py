@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSON
 
 
-revision = "0022_payment_gateways_email_servers"
-down_revision = "0022_setup_operation_points_email"
+revision = "0022_pay_gateways_email"
+down_revision = "0022_setup_ops_email"
 branch_labels = None
 depends_on = None
 

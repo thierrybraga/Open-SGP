@@ -33,3 +33,13 @@ def test_boleto_due_factor_uses_2025_febraban_restart():
     assert "DATA_REINICIO_FATOR" in boleto
     assert "FATOR_REINICIO = 1000" in boleto
     assert "fator % 9999" not in boleto
+
+
+def test_boleto_pdf_draws_real_barcode():
+    pdf_generator = (
+        Path(__file__).resolve().parents[1] / "app" / "modules" / "billing" / "pdf_generator.py"
+    ).read_text(encoding="utf-8")
+
+    assert "_draw_interleaved_2_of_5" in pdf_generator
+    assert "ITF_PATTERNS" in pdf_generator
+    assert "simulado" not in pdf_generator.lower()

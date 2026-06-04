@@ -1,228 +1,198 @@
+"""
+Deploy local do Open-SGP usando Docker Compose.
 
+Fluxo:
+1. valida Docker/Compose e arquivo .env
+2. executa build das imagens
+3. sobe banco/Redis e executa Alembic
+4. sobe API, painel admin, worker e Zabbix
+5. valida endpoints de saúde e status dos containers
+"""
+
+from __future__ import annotations
+
+import argparse
+import base64
 import os
-import sys
+import secrets
 import subprocess
+import sys
 import time
-import socket
-import json
-import shutil
-from datetime import datetime
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
-# Cores para output
-class Colors:
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKCYAN = '\033[96m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
 
-def print_step(msg):
-    print(f"\n{Colors.HEADER}=== {msg} ==={Colors.ENDC}")
+ROOT = Path(__file__).resolve().parent
+ENV_FILE = ROOT / ".env"
+ENV_EXAMPLE = ROOT / ".env.example"
+COMPOSE_FILE = ROOT / "docker-compose.prod.yml"
 
-def print_ok(msg):
-    print(f"{Colors.OKGREEN}[OK] {msg}{Colors.ENDC}")
+REQUIRED_ENV = {
+    "ENVIRONMENT": "production",
+    "SECRET_KEY": None,
+    "ENCRYPTION_KEY": None,
+    "POSTGRES_PASSWORD": None,
+    "DATABASE_URL": None,
+    "REDIS_URL": None,
+    "CORS_ALLOW_ORIGINS": None,
+}
 
-def print_fail(msg):
-    print(f"{Colors.FAIL}[FAIL] {msg}{Colors.ENDC}")
 
-def print_info(msg):
-    print(f"{Colors.OKCYAN}[INFO] {msg}{Colors.ENDC}")
+class DeployError(RuntimeError):
+    pass
 
-def check_command(command):
-    return shutil.which(command) is not None
 
-def check_port(host, port):
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.settimeout(1)
-        return s.connect_ex((host, port)) == 0
+def run(cmd: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+    print(f"$ {' '.join(cmd)}")
+    return subprocess.run(
+        cmd,
+        cwd=ROOT,
+        text=True,
+        check=check,
+    )
 
-def get_system_info():
-    print_step("Coletando Informações do Sistema")
-    
-    info = {
-        "os": sys.platform,
-        "python": sys.version.split()[0],
-        "cwd": os.getcwd(),
-        "timestamp": datetime.now().isoformat()
-    }
-    
-    # Check Docker
-    try:
-        docker_version = subprocess.check_output(["docker", "--version"]).decode().strip()
-        info["docker"] = docker_version
-        print_ok(f"Docker encontrado: {docker_version}")
-    except:
-        info["docker"] = "Not found"
-        print_fail("Docker não encontrado")
 
-    # Check Docker Compose
-    try:
-        compose_version = subprocess.check_output(["docker-compose", "--version"]).decode().strip()
-        info["docker_compose"] = compose_version
-        print_ok(f"Docker Compose encontrado: {compose_version}")
-    except:
-        info["docker_compose"] = "Not found"
-        print_fail("Docker Compose não encontrado")
+def compose_cmd(*args: str) -> list[str]:
+    return ["docker", "compose", "--env-file", str(ENV_FILE), "-f", str(COMPOSE_FILE), *args]
 
-    print_info(f"Sistema Operacional: {info['os']}")
-    print_info(f"Diretório Atual: {info['cwd']}")
-    
-    return info
 
-def start_docker_desktop():
-    print_info("Tentando iniciar o Docker Desktop automaticamente...")
-    possible_paths = [
-        r"C:\Program Files\Docker\Docker\Docker Desktop.exe",
-        r"C:\Program Files (x86)\Docker\Docker\Docker Desktop.exe"
-    ]
-    
-    started = False
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                # Usar Popen para não bloquear o script
-                subprocess.Popen([path], close_fds=True)
-                print_ok(f"Docker Desktop iniciado: {path}")
-                started = True
-                break
-            except Exception as e:
-                print_fail(f"Erro ao iniciar Docker Desktop: {e}")
-    
-    if not started:
-        print_fail("Não foi possível encontrar o executável do Docker Desktop.")
-        print_info("Por favor, inicie-o manualmente.")
-        return False
-        
-    print_info("Aguardando Docker Engine inicializar (pode levar alguns minutos)...")
-    
-    # Aguardar até 2 minutos
-    for i in range(60):
-        try:
-            subprocess.check_call(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print()
-            print_ok("Docker Engine detectado e operante!")
-            return True
-        except subprocess.CalledProcessError:
-            time.sleep(2)
-            sys.stdout.write(".")
-            sys.stdout.flush()
-    
-    print()
-    print_fail("Timeout aguardando Docker Engine. Verifique se o Docker Desktop está rodando.")
-    return False
+def check_prerequisites() -> None:
+    if not COMPOSE_FILE.exists():
+        raise DeployError(f"Arquivo ausente: {COMPOSE_FILE.name}")
+    run(["docker", "--version"])
+    run(["docker", "compose", "version"])
+    run(["docker", "info"])
 
-def check_docker_daemon():
-    print_step("Verificando Docker Daemon")
-    try:
-        subprocess.check_call(["docker", "info"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        print_ok("Docker Daemon está rodando")
-        return True
-    except subprocess.CalledProcessError:
-        print_fail("Docker Daemon NÃO está rodando!")
-        return start_docker_desktop()
 
-def setup_environment():
-    print_step("Configurando Ambiente")
-    
-    # 1. Verificar .env
-    if not os.path.exists(".env"):
-        if os.path.exists(".env.example"):
-            shutil.copy(".env.example", ".env")
-            print_ok("Arquivo .env criado a partir de .env.example")
-        else:
-            print_fail("Arquivo .env.example não encontrado!")
-            return False
-    else:
-        print_ok("Arquivo .env já existe")
-
-    # 2. Verificar diretórios necessários
-    dirs = ["pgdata", "radius/sql"]
-    for d in dirs:
-        if not os.path.exists(d):
-            try:
-                os.makedirs(d, exist_ok=True)
-                print_ok(f"Diretório criado: {d}")
-            except Exception as e:
-                print_fail(f"Falha ao criar diretório {d}: {e}")
-
-    return True
-
-def deploy_containers():
-    print_step("Iniciando Deploy (Docker Compose)")
-    
-    cmd = ["docker-compose", "up", "-d", "--build"]
-    
-    try:
-        print_info("Executando build e start dos containers... (Isso pode demorar)")
-        subprocess.check_call(cmd)
-        print_ok("Comando docker-compose executado com sucesso")
-        return True
-    except subprocess.CalledProcessError as e:
-        print_fail(f"Falha no deploy: {e}")
-        return False
-
-def verify_services():
-    print_step("Verificando Serviços")
-    
-    services = [
-        {"name": "API Backend", "port": 8000},
-        {"name": "Admin Panel", "port": 5000},
-        {"name": "PostgreSQL", "port": 5432},
-        {"name": "Redis", "port": 6379},
-        {"name": "Radius Auth", "port": 1812}, # UDP, hard to check with simple TCP connect
-        {"name": "Zabbix Web", "port": 8081}
-    ]
-    
-    print_info("Aguardando 10 segundos para inicialização dos serviços...")
-    time.sleep(10)
-    
-    all_ok = True
-    for svc in services:
-        # Pular check TCP para Radius (UDP)
-        if svc["name"] == "Radius Auth":
+def parse_env(path: Path) -> dict[str, str]:
+    values: dict[str, str] = {}
+    if not path.exists():
+        return values
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-            
-        if check_port("localhost", svc["port"]):
-            print_ok(f"{svc['name']} está acessível na porta {svc['port']}")
-        else:
-            print_fail(f"{svc['name']} NÃO está respondendo na porta {svc['port']}")
-            all_ok = False
-            
-    return all_ok
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip().strip('"').strip("'")
+    return values
 
-def main():
-    print(f"{Colors.BOLD}=== Open-SGP Installer & Deployer ==={Colors.ENDC}\n")
-    
-    # 1. System Info
-    sys_info = get_system_info()
-    
-    # 2. Docker Daemon Check
-    if not check_docker_daemon():
-        sys.exit(1)
-        
-    # 3. Setup Env
-    if not setup_environment():
-        sys.exit(1)
-        
-    # 4. Deploy
-    if not deploy_containers():
-        sys.exit(1)
-        
-    # 5. Verify
-    if verify_services():
-        print_step("Deploy Concluído com Sucesso!")
-        print_info("Acesse o sistema em:")
-        print(f"   Admin Panel: http://localhost:5000")
-        print(f"   API Docs:    http://localhost:8000/docs")
-        print(f"   Zabbix:      http://localhost:8081")
-    else:
-        print_step("Deploy Finalizado com Avisos")
-        print_info("Alguns serviços podem não ter iniciado corretamente.")
-        print_info("Verifique os logs com: docker-compose logs -f")
+
+def generate_env() -> None:
+    if ENV_FILE.exists():
+        raise DeployError(".env já existe; remova-o manualmente se quiser regenerar")
+    if not ENV_EXAMPLE.exists():
+        raise DeployError(".env.example não encontrado")
+
+    secret = secrets.token_urlsafe(48)
+    postgres_password = secrets.token_urlsafe(32)
+    encryption_key = run_python_fernet_key()
+
+    content = ENV_EXAMPLE.read_text(encoding="utf-8")
+    replacements = {
+        "ENVIRONMENT=development": "ENVIRONMENT=production",
+        "SECRET_KEY=CHANGE_ME_IN_PRODUCTION_USE_STRONG_SECRET_KEY": f"SECRET_KEY={secret}",
+        "ENCRYPTION_KEY=": f"ENCRYPTION_KEY={encryption_key}",
+        "POSTGRES_PASSWORD=change-me-postgres-password": f"POSTGRES_PASSWORD={postgres_password}",
+        "DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/isp_erp": (
+            f"DATABASE_URL=postgresql+psycopg2://postgres:{postgres_password}@db:5432/isp_erp"
+        ),
+        "REDIS_URL=redis://localhost:6379/0": "REDIS_URL=redis://redis:6379/0",
+        "CORS_ALLOW_ORIGINS=http://localhost:3000,http://localhost:8080": (
+            "CORS_ALLOW_ORIGINS=http://localhost:5000,http://127.0.0.1:5000"
+        ),
+    }
+    for old, new in replacements.items():
+        content = content.replace(old, new)
+    ENV_FILE.write_text(content, encoding="utf-8")
+    print(".env gerado com chaves locais. Revise integrações reais antes de produção externa.")
+
+
+def run_python_fernet_key() -> str:
+    return base64.urlsafe_b64encode(os.urandom(32)).decode()
+
+
+def validate_env() -> None:
+    values = parse_env(ENV_FILE)
+    if not values:
+        raise DeployError("Arquivo .env ausente. Execute: python deploy.py init-env")
+
+    missing = [key for key in REQUIRED_ENV if not values.get(key)]
+    if missing:
+        raise DeployError(f"Variáveis obrigatórias ausentes no .env: {', '.join(missing)}")
+
+    if values.get("ENVIRONMENT") != "production":
+        raise DeployError("ENVIRONMENT deve ser production para este deploy")
+    if values.get("SECRET_KEY", "").startswith("CHANGE_ME") or len(values.get("SECRET_KEY", "")) < 32:
+        raise DeployError("SECRET_KEY precisa ser forte e ter pelo menos 32 caracteres")
+    if values.get("CORS_ALLOW_ORIGINS") == "*":
+        raise DeployError("CORS_ALLOW_ORIGINS não pode ser '*' em produção")
+    if "localhost" in values.get("DATABASE_URL", ""):
+        raise DeployError("DATABASE_URL do deploy deve apontar para db:5432, não localhost")
+
+
+def wait_for_url(url: str, *, attempts: int = 30, delay: float = 2.0) -> None:
+    last_error = ""
+    for _ in range(attempts):
+        try:
+            req = Request(url, headers={"User-Agent": "open-sgp-deploy"})
+            with urlopen(req, timeout=5) as response:
+                if 200 <= response.status < 500:
+                    return
+        except HTTPError as exc:
+            if 200 <= exc.code < 500:
+                return
+            last_error = str(exc)
+        except (OSError, URLError) as exc:
+            last_error = str(exc)
+        except TimeoutError as exc:
+            last_error = str(exc)
+        time.sleep(delay)
+    raise DeployError(f"Endpoint não respondeu: {url}. Último erro: {last_error}")
+
+
+def deploy(skip_build: bool = False) -> None:
+    check_prerequisites()
+    validate_env()
+
+    if not skip_build:
+        run(compose_cmd("build"))
+
+    run(compose_cmd("up", "-d", "db", "redis"))
+    run(compose_cmd("run", "--rm", "migrate"))
+    run(compose_cmd("up", "-d"))
+
+    wait_for_url("http://127.0.0.1:8000/health/", attempts=45)
+    wait_for_url("http://127.0.0.1:5000/login", attempts=45)
+    run(compose_cmd("ps"))
+
+    print("\nDeploy concluído.")
+    print("API: http://127.0.0.1:8000/docs")
+    print("Painel admin: http://127.0.0.1:5000/login")
+    print("Zabbix: http://127.0.0.1:8081")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Deploy local do Open-SGP")
+    parser.add_argument("action", nargs="?", default="deploy", choices=["deploy", "init-env", "config", "logs"])
+    parser.add_argument("--skip-build", action="store_true")
+    args = parser.parse_args()
+
+    try:
+        if args.action == "init-env":
+            generate_env()
+        elif args.action == "config":
+            validate_env()
+            run(compose_cmd("config"))
+        elif args.action == "logs":
+            run(compose_cmd("logs", "-f", "--tail=200"), check=False)
+        else:
+            deploy(skip_build=args.skip_build)
+        return 0
+    except (DeployError, subprocess.CalledProcessError) as exc:
+        print(f"\nFalha no deploy: {exc}", file=sys.stderr)
+        return 1
+
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

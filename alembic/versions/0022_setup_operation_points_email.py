@@ -14,7 +14,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0022_setup_operation_points_email"
+revision = "0022_setup_ops_email"
 down_revision = "0021_client_pre_registration"
 branch_labels = None
 depends_on = None
@@ -70,6 +70,64 @@ def upgrade():
     op.create_index("idx_operation_points_name", "operation_points", ["name"])
     op.create_index("idx_operation_points_code", "operation_points", ["code"])
 
+    # ===== FINANCE CONFIGURATION =====
+    op.create_table(
+        "companies",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("name", sa.String(150), nullable=False),
+        sa.Column("legal_name", sa.String(200), nullable=False),
+        sa.Column("document", sa.String(20), nullable=False, unique=True),
+        sa.Column("email", sa.String(255), nullable=False),
+        sa.Column("phone", sa.String(30), nullable=False),
+        sa.Column("address", sa.String(255), nullable=True),
+        sa.Column("city", sa.String(100), nullable=True),
+        sa.Column("state", sa.String(2), nullable=True),
+        sa.Column("postal_code", sa.String(20), nullable=True),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+    )
+    op.create_index("idx_companies_document", "companies", ["document"])
+
+    op.create_table(
+        "carriers",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("name", sa.String(120), nullable=False),
+        sa.Column("bank_code", sa.String(10), nullable=False),
+        sa.Column("agency", sa.String(20), nullable=False),
+        sa.Column("account", sa.String(30), nullable=False),
+        sa.Column("wallet", sa.String(10), nullable=False),
+        sa.Column("cnab_layout", sa.String(3), nullable=False, server_default="400"),
+        sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+    )
+
+    op.create_table(
+        "receipt_points",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("name", sa.String(120), nullable=False),
+        sa.Column("description", sa.String(255), nullable=False),
+        sa.Column("company_id", sa.Integer(), nullable=False),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),
+    )
+
+    op.create_table(
+        "financial_parameters",
+        sa.Column("id", sa.Integer(), primary_key=True),
+        sa.Column("company_id", sa.Integer(), nullable=False),
+        sa.Column("default_carrier_id", sa.Integer(), nullable=True),
+        sa.Column("fine_percent", sa.Float(), nullable=False, server_default="2.0"),
+        sa.Column("interest_percent", sa.Float(), nullable=False, server_default="1.0"),
+        sa.Column("send_email_on_issue", sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column("created_at", sa.DateTime(), nullable=False),
+        sa.Column("updated_at", sa.DateTime(), nullable=False),
+        sa.ForeignKeyConstraint(["company_id"], ["companies.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(["default_carrier_id"], ["carriers.id"], ondelete="SET NULL"),
+    )
+
     # ===== EMAIL CONFIGURATIONS =====
     op.create_table(
         "email_configurations",
@@ -107,6 +165,13 @@ def downgrade():
     op.drop_index("idx_email_configurations_default", "email_configurations")
     op.drop_index("idx_email_configurations_active", "email_configurations")
     op.drop_table("email_configurations")
+
+    # Remover finance configuration
+    op.drop_table("financial_parameters")
+    op.drop_table("receipt_points")
+    op.drop_table("carriers")
+    op.drop_index("idx_companies_document", "companies")
+    op.drop_table("companies")
 
     # Remover operation points
     op.drop_index("idx_operation_points_code", "operation_points")

@@ -136,7 +136,7 @@ def _vendor_clients(device: NetworkDevice):
     if device.vendor == "mikrotik":
         return MikrotikClient(device.host, device.port, device.username, device.password)
     if device.vendor in ("huawei", "zte"):
-        return OLTClient(device.host, device.username, device.password, vendor=device.vendor)
+        return OLTClient(device.host, device.username, device.password, vendor=device.vendor, port=device.port or 23)
     if device.vendor == "vsol":
         return VSOLClient(device.host, device.username, device.password, port=device.port or 23)
     return None
@@ -200,7 +200,7 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
             if dev.vendor == "vsol":
                 olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
             else:
-                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor, port=dev.port or 23)
             olt.set_service_profile(
                 onu_id=str(contract_id), download_mbps=prof.download_speed_mbps, upload_mbps=prof.upload_speed_mbps
             )
@@ -244,7 +244,7 @@ def block_contract(db: Session, contract_id: int) -> ContractNetworkAssignment:
             if dev.vendor == "vsol":
                 olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
             else:
-                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor, port=dev.port or 23)
             olt.remove_service_profile(onu_id=str(contract_id))
             if cna.vlan:
                 olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
@@ -274,7 +274,7 @@ def get_onu_status(db: Session, device_id: int, onu_id: str) -> dict:
     if dev.vendor == "vsol":
         olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
     else:
-        olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+        olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor, port=dev.port or 23)
         
     onu = olt.onu_status(onu_id=str(onu_id))
     if str(onu_id).isdigit():
@@ -291,7 +291,7 @@ def unbind_vlan_for_contract(db: Session, contract_id: int) -> ContractNetworkAs
         if dev.vendor == "vsol":
             olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
         else:
-            olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+            olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor, port=dev.port or 23)
         olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
         _write_history(db, contract_id, "unbind_vlan", f"OLT {dev.vendor}: VLAN {cna.vlan.vlan_id} desassociada")
     db.refresh(cna)
@@ -312,7 +312,7 @@ def unblock_contract(db: Session, contract_id: int) -> ContractNetworkAssignment
             if dev.vendor == "vsol":
                 olt = VSOLClient(dev.host, dev.username, dev.password, port=dev.port or 23)
             else:
-                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor)
+                olt = OLTClient(dev.host, dev.username, dev.password, vendor=dev.vendor, port=dev.port or 23)
             prof = cna.profile
             if prof:
                 olt.set_service_profile(onu_id=str(contract_id), download_mbps=prof.download_speed_mbps, upload_mbps=prof.upload_speed_mbps)

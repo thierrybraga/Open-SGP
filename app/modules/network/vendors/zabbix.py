@@ -113,6 +113,21 @@ class ZabbixClient:
         result = self._request("hostgroup.create", {"name": name})
         return result['groupids'][0]
 
+    def get_template_ids_by_names(self, names: list[str]) -> list[str]:
+        """Resolve template names to Zabbix template IDs."""
+        if not names:
+            return []
+        result = self._request("template.get", {
+            "filter": {"host": names},
+            "output": ["templateid", "host", "name"],
+        })
+        found = {item.get("host"): item["templateid"] for item in result}
+        found.update({item.get("name"): item["templateid"] for item in result})
+        missing = [name for name in names if name not in found]
+        if missing:
+            logger.warning("Zabbix templates not found: %s", ", ".join(missing))
+        return [found[name] for name in names if name in found]
+
     def create_host(self, host_name: str, ip: str, group_id: str, template_ids: list = None):
         """Cria um host no Zabbix."""
         if not template_ids:

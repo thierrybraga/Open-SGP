@@ -6,6 +6,7 @@ Lógica de negócio para Payment Gateways.
 """
 
 from sqlalchemy.orm import Session
+import requests
 
 from .models import PaymentGateway
 from .schemas import PaymentGatewayCreate, PaymentGatewayUpdate
@@ -72,20 +73,67 @@ def test_gateway_connection(db: Session, gateway_id: int) -> dict:
     if not gateway:
         return {"success": False, "error": "Gateway not found"}
 
-    # Implementação simplificada - em produção, fazer requisição real à API do provedor
     try:
-        # Aqui seria feita uma requisição real de teste ao provedor
-        # Por exemplo: para Pagar.me, fazer GET /1/status
-        # Para MercadoPago, fazer GET /v1/users/me
-
-        return {
-            "success": True,
-            "provider": gateway.provider,
-            "environment": gateway.environment,
-            "message": "Connection test successful (simulated)"
-        }
+        return _test_provider_connection(gateway)
     except Exception as e:
         return {
             "success": False,
             "error": str(e)
         }
+
+
+def _test_provider_connection(gateway: PaymentGateway) -> dict:
+    provider = gateway.provider.lower()
+    if provider == "asaas":
+        return _test_asaas(gateway)
+    if provider == "mercadopago":
+        return _test_mercadopago(gateway)
+    if provider == "stripe":
+        return _test_stripe(gateway)
+    raise ValueError(f"Provider {gateway.provider} does not have a real connection test implemented")
+
+
+def _credential(gateway: PaymentGateway, *names: str) -> str:
+    credentials = gateway.credentials or {}
+    for name in names:
+        value = credentials.get(name)
+        if value:
+            return str(value)
+    raise ValueError(f"Missing credential: one of {', '.join(names)}")
+
+
+def _test_asaas(gateway: PaymentGateway) -> dict:
+    api_key = _credential(gateway, "api_key", "access_token")
+    base_url = "https://sandbox.asaas.com/api/v3" if gateway.environment == "sandbox" else "https://api.asaas.com/v3"
+    response = requests.get(f"{base_url}/myAccount", headers={"access_token": api_key}, timeout=15)
+    return _gateway_response(gateway, response)
+
+
+def _test_mercadopago(gateway: PaymentGateway) -> dict:
+    token = _credential(gateway, "access_token", "api_key")
+    response = requests.get("https://api.mercadopago.com/users/me", headers={"Authorization": f"Bearer {token}"}, timeout=15)
+    return _gateway_response(gateway, response)
+
+
+def _test_stripe(gateway: PaymentGateway) -> dict:
+    api_key = _credential(gateway, "secret_key", "api_key")
+    response = requests.get("https://api.stripe.com/v1/account", auth=(api_key, ""), timeout=15)
+    return _gateway_response(gateway, response)
+
+
+def _gateway_response(gateway: PaymentGateway, response: requests.Response) -> dict:
+    if response.status_code >= 400:
+        return {
+            "success": False,
+            "provider": gateway.provider,
+            "environment": gateway.environment,
+            "status_code": response.status_code,
+            "error": response.text[:500],
+        }
+    return {
+        "success": True,
+        "provider": gateway.provider,
+        "environment": gateway.environment,
+        "status_code": response.status_code,
+        "message": "Connection test successful",
+    }

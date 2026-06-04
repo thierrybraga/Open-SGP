@@ -12,7 +12,6 @@ Integrações:
 from io import BytesIO
 from datetime import date
 from typing import List
-import base64
 
 try:
     from reportlab.lib.pagesizes import A4
@@ -22,6 +21,62 @@ try:
     REPORTLAB_AVAILABLE = True
 except ImportError:
     REPORTLAB_AVAILABLE = False
+
+
+ITF_PATTERNS = {
+    "0": "00110",
+    "1": "10001",
+    "2": "01001",
+    "3": "11000",
+    "4": "00101",
+    "5": "10100",
+    "6": "01100",
+    "7": "00011",
+    "8": "10010",
+    "9": "01010",
+}
+
+
+def _draw_interleaved_2_of_5(pdf, code: str, x: float, y: float, height: float, narrow: float = 0.33 * mm) -> None:
+    """
+    Draws an Interleaved 2 of 5 barcode, the numeric symbology used for
+    Brazilian boleto barcodes.
+    """
+    digits = "".join(filter(str.isdigit, code or ""))
+    if len(digits) % 2:
+        digits = "0" + digits
+    if not digits:
+        return
+
+    wide = narrow * 3
+    cursor = x
+
+    def draw_bar(width: float) -> None:
+        nonlocal cursor
+        pdf.rect(cursor, y, width, height, stroke=0, fill=1)
+        cursor += width
+
+    def skip(width: float) -> None:
+        nonlocal cursor
+        cursor += width
+
+    # Start pattern: narrow bar, narrow space, narrow bar, narrow space.
+    draw_bar(narrow)
+    skip(narrow)
+    draw_bar(narrow)
+    skip(narrow)
+
+    for idx in range(0, len(digits), 2):
+        bars = ITF_PATTERNS[digits[idx]]
+        spaces = ITF_PATTERNS[digits[idx + 1]]
+        for bar_bit, space_bit in zip(bars, spaces):
+            draw_bar(wide if bar_bit == "1" else narrow)
+            skip(wide if space_bit == "1" else narrow)
+
+    # Stop pattern: wide bar, narrow space, narrow bar.
+    draw_bar(wide)
+    skip(narrow)
+    draw_bar(narrow)
 
 
 def generate_carne_pdf(titles: List, client_name: str, contract_id: int) -> bytes:
@@ -224,8 +279,10 @@ def generate_boleto_pdf(title, client_data: dict, company_data: dict) -> bytes:
     pdf.drawString(30*mm, y_pos, f"Documento: {client_data.get('document', '')}")
     y_pos -= 10*mm
 
-    # Código de barras (simulado - em produção usar biblioteca específica)
     if title.bar_code:
+        pdf.setFillColor(colors.black)
+        _draw_interleaved_2_of_5(pdf, title.bar_code, 30*mm, y_pos - 16*mm, 14*mm)
+        y_pos -= 20*mm
         pdf.setFont("Courier", 8)
         pdf.drawString(30*mm, y_pos, f"Código de Barras: {title.bar_code}")
 

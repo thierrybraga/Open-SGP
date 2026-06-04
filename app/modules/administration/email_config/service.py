@@ -11,27 +11,25 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+from ....core.encryption import decrypt_password as fernet_decrypt_password
+from ....core.encryption import encrypt_password as fernet_encrypt_password
+from ....core.encryption import migrate_from_base64
 from .models import EmailConfiguration
 from .schemas import EmailConfigurationCreate, EmailConfigurationUpdate, EmailTestRequest
 
 
 def encrypt_password(password: str) -> str:
-    """
-    Criptografa senha do SMTP.
-    Implementação simples - em produção usar Fernet ou similar.
-    """
-    # TODO: Implementar criptografia real (Fernet, AES, etc.)
-    import base64
-    return base64.b64encode(password.encode()).decode()
+    """Criptografa senha do SMTP com Fernet."""
+    return fernet_encrypt_password(password)
 
 
 def decrypt_password(encrypted: str) -> str:
-    """
-    Descriptografa senha do SMTP.
-    """
-    # TODO: Implementar descriptografia real
-    import base64
-    return base64.b64decode(encrypted.encode()).decode()
+    """Descriptografa senha do SMTP, migrando valores legados em base64."""
+    try:
+        return fernet_decrypt_password(encrypted)
+    except Exception:
+        migrated = migrate_from_base64(encrypted)
+        return fernet_decrypt_password(migrated)
 
 
 def create_email_configuration(db: Session, data: EmailConfigurationCreate) -> EmailConfiguration:
@@ -82,12 +80,20 @@ def get_default_email_configuration(db: Session) -> EmailConfiguration | None:
     ).first()
 
 
+def migrate_email_configuration_secret(db: Session, config: EmailConfiguration) -> None:
+    migrated = migrate_from_base64(config.smtp_password)
+    if migrated != config.smtp_password:
+        config.smtp_password = migrated
+        db.add(config)
+        db.commit()
+
+
 def test_email_configuration(db: Session, config: EmailConfiguration, test_request: EmailTestRequest) -> dict:
     """
     Testa configuração de email enviando um e-mail de teste.
     """
     try:
-        # Descriptografar senha
+        migrate_email_configuration_secret(db, config)
         password = decrypt_password(config.smtp_password)
 
         # Criar mensagem
@@ -182,6 +188,7 @@ def send_email(db: Session, to_email: str, subject: str, body: str, config_id: i
         raise ValueError("No email configuration available")
 
     try:
+        migrate_email_configuration_secret(db, config)
         password = decrypt_password(config.smtp_password)
 
         msg = MIMEMultipart()

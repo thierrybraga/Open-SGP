@@ -14,7 +14,7 @@ from alembic import op
 import sqlalchemy as sa
 
 
-revision = "0020_due_dates_discounts_comodato"
+revision = "0020_due_discount_comodato"
 down_revision = "0019_viability_contracts_cashier"
 branch_labels = None
 depends_on = None

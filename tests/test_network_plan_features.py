@@ -18,22 +18,17 @@ def _function_source(relative: str, name: str) -> str:
     raise AssertionError(f"Function {name} not found in {relative}")
 
 
-def test_generic_olt_adapter_does_not_fake_onu_or_vlan_success():
+def test_huawei_zte_olt_adapter_uses_device_session_and_keeps_generic_unsupported():
     olt_vendor = _read("app/modules/network/vendors/olt.py")
+    service = _read("app/modules/network/service.py")
 
     assert "source\": \"simulated\"" not in olt_vendor
-    for method in (
-        "provision_vlan",
-        "set_service_profile",
-        "remove_service_profile",
-        "bind_vlan",
-        "unbind_vlan",
-        "onu_status",
-    ):
-        method_source = _function_source("app/modules/network/vendors/olt.py", method)
-        assert "raise NotImplementedError" in method_source
-        assert "return True" not in method_source
-        assert "return {" not in method_source
+    assert "socket.create_connection" in olt_vendor
+    assert "class OLTCommandError" in olt_vendor
+    assert "def _ensure_supported" in olt_vendor
+    assert "raise NotImplementedError" in _function_source("app/modules/network/vendors/olt.py", "_ensure_supported")
+    assert "vendor=dev.vendor, port=dev.port or 23" in service
+    assert '"source": "device"' in _function_source("app/modules/network/vendors/olt.py", "onu_status")
 
 
 def test_vsol_adapter_uses_device_session_instead_of_simulated_onu_data():
@@ -64,6 +59,16 @@ def test_network_routes_map_unsupported_olt_adapter_to_501():
     assert "def onu_status(" in routes
     assert "onu = get_onu_status" in routes
     assert "status = get_onu_status" not in routes
+
+
+def test_zabbix_templates_are_resolved_by_name():
+    zabbix_sync = _read("app/modules/network/zabbix_sync.py")
+    zabbix_vendor = _read("app/modules/network/vendors/zabbix.py")
+
+    assert "DEFAULT_TEMPLATE_MAP" in zabbix_sync
+    assert "template_map" in zabbix_sync
+    assert "get_template_ids_by_names" in zabbix_vendor
+    assert "TODO" not in zabbix_sync
 
 
 def test_plan_changes_sync_service_profile_and_radius_template():

@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 revision = "0021_client_pre_registration"
-down_revision = "0020_due_dates_discounts_comodato"
+down_revision = "0020_due_discount_comodato"
 branch_labels = None
 depends_on = None
 

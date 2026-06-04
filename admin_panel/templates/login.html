@@ -373,7 +373,9 @@
 
         <!-- Footer Links -->
         <div class="login-footer">
+          {% if public_registration_enabled %}
           <p>Não tem uma conta? <a href="/register" class="login-link">Criar conta</a></p>
+          {% endif %}
           <div class="login-footer-links">
             <a href="/help" class="login-footer-link">Ajuda</a>
             <span class="login-footer-separator">•</span>

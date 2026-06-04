@@ -1,0 +1,184 @@
+name: open-sgp
+
+services:
+  api:
+    build:
+      context: .
+    image: open-sgp-api:local
+    container_name: open_sgp_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AUTO_CREATE_TABLES: "false"
+      PUBLIC_REGISTRATION_ENABLED: "false"
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command:
+      - gunicorn
+      - app.main:app
+      - --worker-class
+      - uvicorn.workers.UvicornWorker
+      - --bind
+      - 0.0.0.0:8000
+      - --workers
+      - "${API_WORKERS:-2}"
+      - --timeout
+      - "120"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  admin:
+    image: open-sgp-api:local
+    container_name: open_sgp_admin
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      API_PUBLIC_URL: ${API_PUBLIC_URL:-http://localhost:8000}
+      AUTO_CREATE_TABLES: "false"
+      PUBLIC_REGISTRATION_ENABLED: "false"
+    ports:
+      - "${ADMIN_PORT:-5000}:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command:
+      - gunicorn
+      - admin_panel.app:app
+      - --bind
+      - 0.0.0.0:5000
+      - --workers
+      - "${ADMIN_WORKERS:-2}"
+      - --timeout
+      - "120"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=5)\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+
+  worker_comm:
+    image: open-sgp-api:local
+    container_name: open_sgp_worker_comm
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AUTO_CREATE_TABLES: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    command: ["python", "-m", "app.workers.communication_worker"]
+
+  migrate:
+    image: open-sgp-api:local
+    container_name: open_sgp_migrate
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      AUTO_CREATE_TABLES: "false"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+
+  db:
+    image: postgres:16-alpine
+    container_name: open_sgp_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-isp_erp}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - open_sgp_pgdata:/var/lib/postgresql/data
+      - ./scripts/init-zabbix-db.sh:/docker-entrypoint-initdb.d/init-zabbix-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-isp_erp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: open_sgp_redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - open_sgp_redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:ubuntu-7.0-latest
+    container_name: open_sgp_zabbix_server
+    restart: unless-stopped
+    environment:
+      DB_SERVER_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: zabbix
+      ZBX_STARTPOLLERS: ${ZBX_STARTPOLLERS:-5}
+    ports:
+      - "${ZABBIX_SERVER_PORT:-10051}:10051"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:ubuntu-7.0-latest
+    container_name: open_sgp_zabbix_web
+    restart: unless-stopped
+    environment:
+      DB_SERVER_HOST: db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: zabbix
+      ZBX_SERVER_HOST: zabbix-server
+      PHP_TZ: ${TZ:-America/Sao_Paulo}
+    ports:
+      - "${ZABBIX_WEB_PORT:-8081}:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      zabbix-server:
+        condition: service_started
+
+volumes:
+  open_sgp_pgdata:
+  open_sgp_redisdata:

@@ -14,14 +14,14 @@ from sqlalchemy import create_engine, func, case
 import secrets
 import os
 
-from ..app.core.config import settings
-from ..app.core.database import import_all_models, SessionLocal, Base, engine
-from ..app.modules.communication.models import MessageQueue
-from ..app.modules.communication.service import requeue_failed, dispatch_message
-from ..app.modules.reports.service import dashboard_overview, timeseries_communication_success, timeseries_service_orders_status
-from ..app.modules.service_orders.models import ServiceOrder
-from ..app.modules.network.models import ContractNetworkAssignment, ContractTechHistory
-from ..app.modules.network.service import (
+from app.core.config import settings
+from app.core.database import import_all_models, SessionLocal, Base, engine
+from app.modules.communication.models import MessageQueue
+from app.modules.communication.service import requeue_failed, dispatch_message
+from app.modules.reports.service import dashboard_overview, timeseries_communication_success, timeseries_service_orders_status
+from app.modules.service_orders.models import ServiceOrder
+from app.modules.network.models import ContractNetworkAssignment, ContractTechHistory
+from app.modules.network.service import (
     unblock_contract, 
     provision_contract, 
     block_contract, 
@@ -30,43 +30,43 @@ from ..app.modules.network.service import (
     get_radius_usage_history,
     test_device_connection
 )
-from ..app.modules.administration.pops.models import POP
-from ..app.modules.administration.nas.models import NAS
-from ..app.modules.administration.variables.models import SystemVariable
-from ..app.modules.administration.backups.models import BackupJob, BackupExecution
-from ..app.modules.administration.backups.service import trigger_backup
-from ..app.modules.network.models import NetworkDevice, VLAN, IPPool, ServiceProfile
-from ..app.modules.administration.finance.models import Company, Carrier, ReceiptPoint, FinancialParameter
-from ..app.modules.billing.service import (
+from app.modules.administration.pops.models import POP
+from app.modules.administration.nas.models import NAS
+from app.modules.administration.variables.models import SystemVariable
+from app.modules.administration.backups.models import BackupJob, BackupExecution
+from app.modules.administration.backups.service import trigger_backup
+from app.modules.network.models import NetworkDevice, VLAN, IPPool, ServiceProfile
+from app.modules.administration.finance.models import Company, Carrier, ReceiptPoint, FinancialParameter
+from app.modules.billing.service import (
     generate_remittance_file,
     generate_remittance_file_for_default_carrier,
     generate_boleto,
     register_payment,
 )
-from ..app.modules.plans.models import Plan
-from ..app.modules.contracts.models import Contract
-from ..app.modules.users.models import User
-from ..app.modules.roles.models import Role
-from ..app.modules.permissions.models import Permission
-from ..app.core.security import hash_password
-from ..app.modules.clients.models import Client
-from ..app.modules.support.models import Ticket, TicketCategory, TicketMessage, Occurrence
-from ..app.modules.support.service import (
+from app.modules.plans.models import Plan
+from app.modules.contracts.models import Contract
+from app.modules.users.models import User
+from app.modules.roles.models import Role
+from app.modules.permissions.models import Permission
+from app.core.security import hash_password
+from app.modules.clients.models import Client
+from app.modules.support.models import Ticket, TicketCategory, TicketMessage, Occurrence
+from app.modules.support.service import (
     create_ticket, update_ticket, add_message, 
     create_category, get_categories, get_ticket_messages,
     create_occurrence, update_occurrence
 )
-from ..app.modules.support.schemas import (
+from app.modules.support.schemas import (
     TicketCreate, TicketUpdate, MessageCreate, CategoryCreate,
     OccurrenceCreate, OccurrenceUpdate
 )
-from ..app.modules.service_orders.models import ServiceOrder, ServiceOrderItem
-from ..app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderUpdate, ServiceOrderItemCreate, AssignTechnician
-from ..app.modules.service_orders.service import create_order, update_order, assign_technician, complete_order, add_item
-from ..app.modules.technician_app.service import list_assigned_orders, start_order, complete_order as tech_complete_order
-from ..app.modules.stock.models import StockItem, Warehouse, StockMovement
-from ..app.modules.billing.models import Title
-from ..app.core.security import verify_password, hash_password, create_access_token
+from app.modules.service_orders.models import ServiceOrder, ServiceOrderItem
+from app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderUpdate, ServiceOrderItemCreate, AssignTechnician
+from app.modules.service_orders.service import create_order, update_order, assign_technician, complete_order, add_item
+from app.modules.technician_app.service import list_assigned_orders, start_order, complete_order as tech_complete_order
+from app.modules.stock.models import StockItem, Warehouse, StockMovement
+from app.modules.billing.models import Title
+from app.core.security import verify_password, hash_password, create_access_token
 
 
 def authenticate_user(db: Session, username: str | None, password: str | None) -> User | None:
@@ -118,6 +118,7 @@ def create_app() -> Flask:
             access_token=session.get("access_token"),
             api_base_url=os.getenv("API_PUBLIC_URL", "http://localhost:8000"),
             csrf_token=get_csrf_token(),
+            public_registration_enabled=settings.public_registration_enabled,
         )
 
     @app.before_request
@@ -130,6 +131,8 @@ def create_app() -> Flask:
             if not session.get("authenticated"):
                 flash("Por favor, faça login para acessar esta página", "warning")
                 return redirect(url_for("login"))
+            if "admin" not in session.get("roles", []):
+                abort(403, description="Admin role required")
         if request.method in {"POST", "PUT", "PATCH", "DELETE"} and not validate_csrf_token():
             abort(400, description="Invalid CSRF token")
         return None
@@ -160,9 +163,10 @@ def create_app() -> Flask:
                 session["user"] = user.username
                 session["user_id"] = user.id
                 session["authenticated"] = True
+                session["roles"] = [role.name for role in user.roles]
                 session["access_token"] = create_access_token(
                     subject=user.username,
-                    claims={"roles": [role.name for role in user.roles]},
+                    claims={"roles": session["roles"]},
                 )
                 session.permanent = remember
                 flash("Login realizado com sucesso!", "success")
@@ -292,7 +296,7 @@ def create_app() -> Flask:
         overview = dashboard_overview(db)
         comm = timeseries_communication_success(db)
         os_ts = timeseries_service_orders_status(db)
-        from ..app.modules.reports.service import communication_success_by_provider, sample_onu_metrics, occurrences_summary
+        from app.modules.reports.service import communication_success_by_provider, sample_onu_metrics, occurrences_summary
         providers_stats = communication_success_by_provider(db)
         onu_summary = sample_onu_metrics(db, limit=8)
         occ_summary = occurrences_summary(db, days=30)
@@ -360,9 +364,9 @@ def create_app() -> Flask:
         
         if request.method == "POST":
             try:
-                from ..app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderItemCreate
-                from ..app.modules.service_orders.service import create_order, update_order
-                from ..app.modules.service_orders.schemas import ServiceOrderUpdate
+                from app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderItemCreate
+                from app.modules.service_orders.service import create_order, update_order
+                from app.modules.service_orders.schemas import ServiceOrderUpdate
                 from datetime import datetime
                 
                 oid = request.form.get("id")
@@ -966,7 +970,7 @@ def create_app() -> Flask:
         items = []
         totals = {"open": 0.0, "paid": 0.0, "overdue": 0.0}
         try:
-            from ..app.modules.billing.models import Title
+            from app.modules.billing.models import Title
             client_id_raw = request.args.get("client_id") or ""
             status_ = (request.args.get("status") or "").strip()
             due_from_raw = request.args.get("due_from") or ""
@@ -978,7 +982,7 @@ def create_app() -> Flask:
             if client_id_raw:
                 try:
                     cid = int(client_id_raw)
-                    from ..app.modules.contracts.models import Contract
+                    from app.modules.contracts.models import Contract
                     q = q.join(Contract, Title.contract_id == Contract.id).filter(Contract.client_id == cid)
                 except Exception:
                     pass
@@ -1005,9 +1009,9 @@ def create_app() -> Flask:
         error = None
         message = None
         try:
-            from ..app.modules.billing.models import Title
-            from ..app.modules.billing.models import TitleAdjustment
-            from ..app.modules.billing.service import calculate_title_effective_amount
+            from app.modules.billing.models import Title
+            from app.modules.billing.models import TitleAdjustment
+            from app.modules.billing.service import calculate_title_effective_amount
             title_id_raw = (request.values.get("title_id") or request.args.get("title_id") or "").strip()
             document_number = (request.values.get("document_number") or request.args.get("document_number") or "").strip()
             if title_id_raw:
@@ -1051,7 +1055,7 @@ def create_app() -> Flask:
         from datetime import date
         db = SessionLocal()
         try:
-            from ..app.modules.billing.models import PaymentPromise
+            from app.modules.billing.models import PaymentPromise
             if request.method == "POST":
                 pid = request.form.get("id")
                 if pid:
@@ -1102,7 +1106,7 @@ def create_app() -> Flask:
     def admin_finance_promises_delete(id: int):
         db = SessionLocal()
         try:
-            from ..app.modules.billing.models import PaymentPromise
+            from app.modules.billing.models import PaymentPromise
             p = db.query(PaymentPromise).filter(PaymentPromise.id == id).first()
             if p:
                 db.delete(p)
@@ -1138,8 +1142,8 @@ def create_app() -> Flask:
                             items.append({"title_id": title_id, "status": status_str, "value": value, "occurred_at": occurred})
                         except Exception:
                             continue
-                from ..app.modules.billing.schemas import ReturnCreate
-                from ..app.modules.billing.service import process_return
+                from app.modules.billing.schemas import ReturnCreate
+                from app.modules.billing.service import process_return
 
                 rf = process_return(db, ReturnCreate(file_name=file_name, items=items))
                 message = f"Retorno processado: {rf.total_items} itens"
@@ -1153,9 +1157,9 @@ def create_app() -> Flask:
         from datetime import date
         db = SessionLocal()
         try:
-            from ..app.modules.fiscal.models import Invoice
-            from ..app.modules.fiscal.schemas import InvoiceCreate
-            from ..app.modules.fiscal.service import create_invoice_record
+            from app.modules.fiscal.models import Invoice
+            from app.modules.fiscal.schemas import InvoiceCreate
+            from app.modules.fiscal.service import create_invoice_record
             
             if request.method == "POST":
                 try:
@@ -1196,7 +1200,7 @@ def create_app() -> Flask:
     def admin_invoices_emit(id: int):
         db = SessionLocal()
         try:
-            from ..app.modules.fiscal.service import emit_invoice
+            from app.modules.fiscal.service import emit_invoice
             emit_invoice(db, id)
             return {"success": True}
         except Exception as e:
@@ -1333,8 +1337,8 @@ def create_app() -> Flask:
         device_id_raw = request.args.get("device_id") or ""
         contract_id_raw = request.args.get("contract_id") or ""
         try:
-            from ..app.modules.network.models import ContractNetworkAssignment, NetworkDevice
-            from ..app.modules.network.service import get_onu_status
+            from app.modules.network.models import ContractNetworkAssignment, NetworkDevice
+            from app.modules.network.service import get_onu_status
             q = (
                 db.query(ContractNetworkAssignment)
                 .join(NetworkDevice, ContractNetworkAssignment.device_id == NetworkDevice.id)
@@ -1385,9 +1389,9 @@ def create_app() -> Flask:
         error = None
         occurrence = None
         try:
-            from ..app.modules.support.models import Occurrence
-            from ..app.modules.support.schemas import OccurrenceUpdate
-            from ..app.modules.support.service import update_occurrence
+            from app.modules.support.models import Occurrence
+            from app.modules.support.schemas import OccurrenceUpdate
+            from app.modules.support.service import update_occurrence
             occurrence = db.query(Occurrence).filter(Occurrence.id == occurrence_id).first()
             if not occurrence:
                 error = "Ocorrência não encontrada"
@@ -1412,9 +1416,9 @@ def create_app() -> Flask:
     def admin_support_occurrence_close(occurrence_id: int):
         db = SessionLocal()
         try:
-            from ..app.modules.support.models import Occurrence
-            from ..app.modules.support.schemas import OccurrenceUpdate
-            from ..app.modules.support.service import update_occurrence
+            from app.modules.support.models import Occurrence
+            from app.modules.support.schemas import OccurrenceUpdate
+            from app.modules.support.service import update_occurrence
             from datetime import datetime
             o = db.query(Occurrence).filter(Occurrence.id == occurrence_id).first()
             if o:
@@ -1428,11 +1432,11 @@ def create_app() -> Flask:
     def admin_support_occurrence_create_os(occurrence_id: int):
         db = SessionLocal()
         try:
-            from ..app.modules.support.models import Occurrence
-            from ..app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderItemCreate
-            from ..app.modules.service_orders.service import create_order
-            from ..app.modules.support.schemas import OccurrenceUpdate
-            from ..app.modules.support.service import update_occurrence
+            from app.modules.support.models import Occurrence
+            from app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderItemCreate
+            from app.modules.service_orders.service import create_order
+            from app.modules.support.schemas import OccurrenceUpdate
+            from app.modules.support.service import update_occurrence
             o = db.query(Occurrence).filter(Occurrence.id == occurrence_id).first()
             if o:
                 priority_map = {"urgent": "urgent", "high": "high", "medium": "medium", "low": "low"}
@@ -1461,7 +1465,7 @@ def create_app() -> Flask:
         content = ""
         filename = "occorrencias.csv"
         try:
-            from ..app.modules.support.models import Occurrence
+            from app.modules.support.models import Occurrence
             import csv, io
             q = db.query(Occurrence)
             # same filters as list
@@ -1948,6 +1952,15 @@ def create_app() -> Flask:
                 if user_id:
                     user = db.query(User).filter(User.id == user_id).first()
                     if user:
+                        duplicate = (
+                            db.query(User)
+                            .filter(User.id != user.id)
+                            .filter((User.username == username) | (User.email == email))
+                            .first()
+                        )
+                        if duplicate:
+                            flash("Usuário ou e-mail já cadastrado.", "error")
+                            return redirect(url_for("admin_users"))
                         user.username = username
                         user.email = email
                         user.is_active = is_active
@@ -1963,7 +1976,13 @@ def create_app() -> Flask:
                         db.commit()
                         flash("Usuário atualizado com sucesso!", "success")
                 else:
-                    hashed = hash_password(password) if password else hash_password("123456") # Fallback
+                    if not password:
+                        flash("Senha é obrigatória para criar usuário.", "error")
+                        return redirect(url_for("admin_users"))
+                    if db.query(User).filter((User.username == username) | (User.email == email)).first():
+                        flash("Usuário ou e-mail já cadastrado.", "error")
+                        return redirect(url_for("admin_users"))
+                    hashed = hash_password(password)
                     new_user = User(
                         username=username,
                         email=email,
@@ -2541,8 +2560,8 @@ def create_app() -> Flask:
     def admin_support_ticket_create_os(ticket_id: int):
         db = SessionLocal()
         try:
-            from ..app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderItemCreate
-            from ..app.modules.service_orders.service import create_order
+            from app.modules.service_orders.schemas import ServiceOrderCreate, ServiceOrderItemCreate
+            from app.modules.service_orders.service import create_order
             
             ticket = db.query(Ticket).filter(Ticket.id == ticket_id).first()
             if ticket:
@@ -2807,10 +2826,10 @@ def create_app() -> Flask:
     # ==========================================
     # CUSTOMER PORTAL
     # ==========================================
-    from ..app.modules.customer_app.service import authenticate_client, compute_profile, list_titles, list_contracts, open_ticket
-    from ..app.modules.customer_app.schemas import TicketCreate
-    from ..app.modules.clients.models import Client
-    from ..app.modules.support.models import Ticket
+    from app.modules.customer_app.service import authenticate_client, compute_profile, list_titles, list_contracts, open_ticket
+    from app.modules.customer_app.schemas import TicketCreate
+    from app.modules.clients.models import Client
+    from app.modules.support.models import Ticket
 
     @app.route("/portal/login", methods=["GET", "POST"])
     def portal_login():
@@ -2914,8 +2933,8 @@ def create_app() -> Flask:
     # ==========================================
     # TECHNICIAN APP
     # ==========================================
-    from ..app.modules.technician_app.service import get_profile_by_user, list_assigned_orders, start_order, complete_order
-    from ..app.modules.technician_app.models import TechnicianProfile
+    from app.modules.technician_app.service import get_profile_by_user, list_assigned_orders, start_order, complete_order
+    from app.modules.technician_app.models import TechnicianProfile
 
     # ==========================================
     # STOCK MANAGEMENT

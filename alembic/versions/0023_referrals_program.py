@@ -13,7 +13,7 @@ import sqlalchemy as sa
 
 
 revision = "0023_referrals_program"
-down_revision = "0022_payment_gateways_email_servers"
+down_revision = "0022_pay_gateways_email"
 branch_labels = None
 depends_on = None
 

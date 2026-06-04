@@ -33,6 +33,8 @@ def list_users(db: Session = Depends(get_db)):
 def create_user_endpoint(data: UserCreate, db: Session = Depends(get_db)):
     if db.query(User).filter(User.username == data.username).first():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already exists")
+    if db.query(User).filter(User.email == data.email).first():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already exists")
     user = create_user(db, data)
     return UserOut(id=user.id, username=user.username, email=user.email, is_active=user.is_active, roles=[r.name for r in user.roles])
 
