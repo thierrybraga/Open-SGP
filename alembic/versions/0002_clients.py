@@ -28,6 +28,7 @@ def upgrade():
         sa.Column("email", sa.String(255), nullable=False, unique=True),
         sa.Column("phone", sa.String(30), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column("password_hash", sa.String(255), nullable=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
     )

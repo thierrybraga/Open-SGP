@@ -40,4 +40,4 @@ def test_alembic_revisions_have_single_head():
     assert not missing_parents, f"Missing parent revisions: {sorted(missing_parents)}"
 
     heads = set(revisions) - down_revisions
-    assert heads == {"0028_billing_decimal_money"}
+    assert heads == {"0034_orm_indexes"}

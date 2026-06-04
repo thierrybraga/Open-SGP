@@ -34,7 +34,7 @@ class MessageQueue(Base, TimestampMixin):
     channel: Mapped[str] = mapped_column(String(20))  # sms, whatsapp, email
     destination: Mapped[str] = mapped_column(String(200))
     content: Mapped[str] = mapped_column(String(2000))
-    template_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    template_id: Mapped[int | None] = mapped_column(ForeignKey("comm_templates.id", ondelete="SET NULL"), nullable=True)
     contract_id: Mapped[int | None] = mapped_column(ForeignKey("contracts.id", ondelete="SET NULL"), nullable=True)
     client_id: Mapped[int | None] = mapped_column(ForeignKey("clients.id", ondelete="SET NULL"), nullable=True)
     provider: Mapped[str | None] = mapped_column(String(50), nullable=True)  # twilio, gatewaysms, whatsapp_api

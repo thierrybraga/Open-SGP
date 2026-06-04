@@ -107,7 +107,12 @@ def create_app() -> Flask:
 
     # Configure session
     app.secret_key = settings.secret_key or secrets.token_hex(32)
-    app.config['SESSION_COOKIE_SECURE'] = settings.is_production()
+    secure_cookie_env = os.getenv("SESSION_COOKIE_SECURE")
+    app.config['SESSION_COOKIE_SECURE'] = (
+        secure_cookie_env.lower() == "true"
+        if secure_cookie_env is not None
+        else settings.is_production()
+    )
     app.config['SESSION_COOKIE_HTTPONLY'] = True
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 

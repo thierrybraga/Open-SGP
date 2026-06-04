@@ -81,6 +81,11 @@ def upgrade():
         sa.Column("ip_pool_id", sa.Integer(), sa.ForeignKey("ip_pools.id", ondelete="SET NULL"), nullable=True),
         sa.Column("vlan_id", sa.Integer(), sa.ForeignKey("vlans.id", ondelete="SET NULL"), nullable=True),
         sa.Column("profile_id", sa.Integer(), sa.ForeignKey("service_profiles.id", ondelete="SET NULL"), nullable=True),
+        sa.Column("pppoe_user", sa.String(64), nullable=True),
+        sa.Column("pppoe_password", sa.String(64), nullable=True),
+        sa.Column("mac_address", sa.String(17), nullable=True),
+        sa.Column("wifi_ssid", sa.String(64), nullable=True),
+        sa.Column("wifi_password", sa.String(64), nullable=True),
         sa.Column("static_ip", sa.String(50), nullable=True),
         sa.Column("cgnat", sa.Boolean(), nullable=False, server_default=sa.text("false")),
         sa.Column("status", sa.String(20), nullable=False, server_default="active"),
@@ -90,6 +95,7 @@ def upgrade():
     )
     op.create_index("ix_cna_contract", "contract_network_assignments", ["contract_id"]) 
     op.create_index("ix_cna_status", "contract_network_assignments", ["status"]) 
+    op.create_unique_constraint("uq_cna_pppoe_user", "contract_network_assignments", ["pppoe_user"])
 
     op.create_table(
         "contract_tech_history",
