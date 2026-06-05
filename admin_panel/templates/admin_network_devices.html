@@ -4,15 +4,225 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dispositivos de Rede - ISP ERP</title>
-  
-  <!-- CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/navbar.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/footer.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/accessibility.css') }}" />
-  
   <link rel="stylesheet" href="{{ url_for('static', filename='css/advanced-components.css') }}" />
+  <style>
+    .network-overview {
+      display: grid;
+      grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.85fr);
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .network-panel,
+    .network-metric,
+    .network-empty-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .network-panel {
+      padding: var(--spacing-lg);
+    }
+
+    .network-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .network-eyebrow {
+      color: var(--text-muted);
+      font-size: var(--font-size-xs);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: var(--spacing-xs);
+      text-transform: uppercase;
+    }
+
+    .network-title {
+      font-size: var(--font-size-2xl);
+      line-height: 1.2;
+      margin: 0 0 var(--spacing-xs);
+    }
+
+    .network-description {
+      color: var(--text-secondary);
+      font-size: var(--font-size-base);
+      margin: 0;
+      max-width: 720px;
+    }
+
+    .network-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+    }
+
+    .network-tag {
+      align-items: center;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-full);
+      color: var(--text-secondary);
+      display: inline-flex;
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      min-height: 32px;
+      padding: 0 var(--spacing-md);
+    }
+
+    .network-status-list {
+      display: grid;
+      gap: var(--spacing-sm);
+      margin-top: var(--spacing-md);
+    }
+
+    .network-status-row {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      gap: var(--spacing-md);
+      padding: var(--spacing-sm) 0;
+    }
+
+    .network-status-row + .network-status-row {
+      border-top: 1px solid var(--border-light);
+    }
+
+    .network-status-label {
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+    }
+
+    .network-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .network-metric {
+      min-height: 132px;
+      padding: var(--spacing-md);
+    }
+
+    .network-metric-top {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      gap: var(--spacing-sm);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .network-metric-label {
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      font-weight: 700;
+    }
+
+    .network-metric-icon {
+      align-items: center;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      color: var(--primary-color);
+      display: inline-flex;
+      height: 36px;
+      justify-content: center;
+      width: 36px;
+    }
+
+    .network-metric-value {
+      color: var(--text-primary);
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+      margin-bottom: var(--spacing-sm);
+    }
+
+    .network-metric-help {
+      color: var(--text-muted);
+      font-size: var(--font-size-sm);
+      margin: 0;
+    }
+
+    .network-content-header {
+      align-items: center;
+      display: flex;
+      justify-content: space-between;
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-md);
+    }
+
+    .network-content-title {
+      font-size: var(--font-size-lg);
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .network-content-subtitle {
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      margin: var(--spacing-xs) 0 0;
+    }
+
+    .network-empty-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--spacing-md);
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .network-empty-card {
+      padding: var(--spacing-md);
+    }
+
+    .network-empty-card-title {
+      font-size: var(--font-size-base);
+      font-weight: 700;
+      margin: 0 0 var(--spacing-xs);
+    }
+
+    .network-empty-card-text {
+      color: var(--text-secondary);
+      font-size: var(--font-size-sm);
+      margin: 0;
+    }
+
+    @media (max-width: 1024px) {
+      .network-overview,
+      .network-empty-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .network-metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .network-panel-header,
+      .network-content-header {
+        align-items: stretch;
+        flex-direction: column;
+      }
+
+      .network-metrics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
 </head>
 <body>
   <a href="#main-content" class="skip-link">Pular para o conteúdo principal</a>
@@ -23,197 +233,202 @@
       <nav aria-label="Breadcrumb" class="breadcrumb">
         <span class="breadcrumb-item"><a href="/">Home</a></span>
         <span class="breadcrumb-separator" aria-hidden="true">/</span>
-        <span class="breadcrumb-item"><a href="/admin/network">Rede</a></span><span class="breadcrumb-separator" aria-hidden="true">/</span>
+        <span class="breadcrumb-item"><a href="/admin/network">Rede</a></span>
+        <span class="breadcrumb-separator" aria-hidden="true">/</span>
         <span class="breadcrumb-item">Dispositivos</span>
       </nav>
 
-      <div class="space-y-6">
-          <!-- Header -->
-          <div class="flex justify-between items-center">
-              <div>
-                  <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Dispositivos de Rede</h1>
-                  <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Gerenciamento de OLTs, Roteadores e Concentradores</p>
-              </div>
-              <button onclick="openDeviceModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2">
-                  <i class="fas fa-plus"></i>
-                  Novo Dispositivo
-              </button>
-          </div>
+      {% set total_devices = items|length %}
+      {% set active_devices = items|selectattr("enabled")|list|length %}
+      {% set olt_devices = items|selectattr("type", "equalto", "olt")|list|length %}
+      {% set monitored_devices = items|selectattr("zabbix_monitored")|list|length %}
 
-          <!-- Filters -->
-          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-4">
-              <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Nome</label>
-                      <input type="text" name="name" value="{{ request.args.get('name') or '' }}" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700">
-                  </div>
-                  <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tipo</label>
-                      <select name="type" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700">
-                          <option value="">Todos</option>
-                          <option value="router" {% if request.args.get('type') == 'router' %}selected{% endif %}>Roteador (Mikrotik)</option>
-                          <option value="olt" {% if request.args.get('type') == 'olt' %}selected{% endif %}>OLT</option>
-                          <option value="switch" {% if request.args.get('type') == 'switch' %}selected{% endif %}>Switch</option>
-                      </select>
-                  </div>
-                  <div>
-                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fabricante</label>
-                      <select name="vendor" class="w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700">
-                          <option value="">Todos</option>
-                          <option value="mikrotik" {% if request.args.get('vendor') == 'mikrotik' %}selected{% endif %}>Mikrotik</option>
-                          <option value="huawei" {% if request.args.get('vendor') == 'huawei' %}selected{% endif %}>Huawei</option>
-                          <option value="zte" {% if request.args.get('vendor') == 'zte' %}selected{% endif %}>ZTE</option>
-                          <option value="vsol" {% if request.args.get('vendor') == 'vsol' %}selected{% endif %}>V-SOL</option>
-                          <option value="juniper" {% if request.args.get('vendor') == 'juniper' %}selected{% endif %}>Juniper</option>
-                          <option value="cisco" {% if request.args.get('vendor') == 'cisco' %}selected{% endif %}>Cisco</option>
-                      </select>
-                  </div>
-                  <div class="flex items-end">
-                      <button type="submit" class="w-full px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
-                          Filtrar
-                      </button>
-                  </div>
-              </form>
+      <section class="network-overview" aria-labelledby="network-overview-title">
+        <div class="network-panel">
+          <div class="network-panel-header">
+            <div>
+              <div class="network-eyebrow">Inventário de rede</div>
+              <h1 class="network-title" id="network-overview-title">Dispositivos de Rede</h1>
+              <p class="network-description">Gerencie roteadores, BRAS, switches e OLTs integrados ao provisionamento.</p>
+            </div>
+            <button type="button" class="btn btn-primary" data-modal-target="modal-device">
+              <span aria-hidden="true">+</span>
+              Novo dispositivo
+            </button>
           </div>
+          <div class="network-tags" aria-label="Tipos de equipamentos suportados">
+            <span class="network-tag">Roteadores</span>
+            <span class="network-tag">BRAS</span>
+            <span class="network-tag">Switches</span>
+            <span class="network-tag">OLTs</span>
+          </div>
+        </div>
 
-          <!-- Data Table -->
-          <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div class="overflow-x-auto">
-                  <table class="w-full text-left text-sm">
-                      <thead class="bg-gray-50 dark:bg-gray-700/50 border-b border-gray-200 dark:border-gray-700">
-                          <tr>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">ID</th>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">Nome</th>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">Tipo</th>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">Fabricante</th>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">Endereço IP</th>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400">Status</th>
-                              <th class="px-6 py-4 font-medium text-gray-500 dark:text-gray-400 text-right">Ações</th>
-                          </tr>
-                      </thead>
-                      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-                          {% for item in items %}
-                          <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
-                              <td class="px-6 py-4 text-gray-600 dark:text-gray-400">#{{ item.id }}</td>
-                              <td class="px-6 py-4 font-medium text-gray-900 dark:text-white">{{ item.name | replace("'", "") }}</td>
-                              <td class="px-6 py-4 text-gray-600 dark:text-gray-400">{{ item.type }}</td>
-                              <td class="px-6 py-4 text-gray-600 dark:text-gray-400">{{ item.vendor }}</td>
-                              <td class="px-6 py-4 text-gray-600 dark:text-gray-400">{{ item.host }}:{{ item.port }}</td>
-                              <td class="px-6 py-4">
-                                  <span class="px-2 py-1 text-xs font-medium rounded-full 
-                                      {% if item.enabled %}bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400
-                                      {% else %}bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400{% endif %}">
-                                      {{ 'Ativo' if item.enabled else 'Inativo' }}
-                                  </span>
-                              </td>
-                              <td class="px-6 py-4 text-right space-x-2">
-                                  <button onclick="testConnection({{ item.id }})" 
-                                      class="text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300" title="Testar Conexão">
-                                      <i class="fas fa-network-wired"></i>
-                                  </button>
-                                  <button onclick='editDevice({{ item.id }}, {{ item.name | tojson }}, {{ item.type | tojson }}, {{ item.vendor | tojson }}, {{ item.host | tojson }}, {{ item.port }}, {{ item.username | tojson }}, {{ item.password | tojson }}, {{ "true" if item.enabled else "false" }})' 
-                                      class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
-                                      <i class="fas fa-edit"></i>
-                                  </button>
-                                  <button onclick="deleteDevice({{ item.id }})" 
-                                      class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
-                                      <i class="fas fa-trash"></i>
-                                  </button>
-                              </td>
-                          </tr>
-                          {% else %}
-                          <tr>
-                              <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-                                  Nenhum dispositivo encontrado
-                              </td>
-                          </tr>
-                          {% endfor %}
-                      </tbody>
-                  </table>
-              </div>
+        <div class="network-panel" aria-label="Estado operacional">
+          <div class="network-eyebrow">Operação</div>
+          <h2 class="network-content-title">Integrações</h2>
+          <div class="network-status-list">
+            <div class="network-status-row">
+              <span class="network-status-label">Provisionamento</span>
+              <span class="status-indicator {{ 'success' if total_devices else 'secondary' }}"><span class="status-dot" aria-hidden="true"></span>{{ 'Configurável' if total_devices else 'Aguardando cadastro' }}</span>
+            </div>
+            <div class="network-status-row">
+              <span class="network-status-label">Zabbix</span>
+              <span class="status-indicator {{ 'success' if monitored_devices else 'secondary' }}"><span class="status-dot" aria-hidden="true"></span>{{ monitored_devices }} monitorado{{ '' if monitored_devices == 1 else 's' }}</span>
+            </div>
+            <div class="network-status-row">
+              <span class="network-status-label">OLTs</span>
+              <span class="status-indicator {{ 'success' if olt_devices else 'secondary' }}"><span class="status-dot" aria-hidden="true"></span>{{ olt_devices }} cadastrado{{ '' if olt_devices == 1 else 's' }}</span>
+            </div>
           </div>
+        </div>
+      </section>
+
+      <section class="network-metrics-grid" aria-label="Resumo dos dispositivos">
+        <article class="network-metric">
+          <div class="network-metric-top">
+            <div class="network-metric-label">Total</div>
+            <div class="network-metric-icon" aria-hidden="true">#</div>
+          </div>
+          <div class="network-metric-value">{{ total_devices }}</div>
+          <p class="network-metric-help">Equipamentos cadastrados no inventário.</p>
+        </article>
+        <article class="network-metric">
+          <div class="network-metric-top">
+            <div class="network-metric-label">Ativos</div>
+            <div class="network-metric-icon" aria-hidden="true">✓</div>
+          </div>
+          <div class="network-metric-value">{{ active_devices }}</div>
+          <p class="network-metric-help">Dispositivos habilitados para operação.</p>
+        </article>
+        <article class="network-metric">
+          <div class="network-metric-top">
+            <div class="network-metric-label">OLTs</div>
+            <div class="network-metric-icon" aria-hidden="true">OLT</div>
+          </div>
+          <div class="network-metric-value">{{ olt_devices }}</div>
+          <p class="network-metric-help">Equipamentos de acesso GPON/EPON.</p>
+        </article>
+        <article class="network-metric">
+          <div class="network-metric-top">
+            <div class="network-metric-label">Monitorados</div>
+            <div class="network-metric-icon" aria-hidden="true">◉</div>
+          </div>
+          <div class="network-metric-value">{{ monitored_devices }}</div>
+          <p class="network-metric-help">Hosts sincronizados ou pendentes no Zabbix.</p>
+        </article>
+      </section>
+
+      {% if total_devices == 0 %}
+      <section class="network-empty-grid" aria-label="Estado inicial">
+        <article class="network-empty-card">
+          <h2 class="network-empty-card-title">Inventário vazio</h2>
+          <p class="network-empty-card-text">Nenhum roteador, BRAS, switch ou OLT foi cadastrado.</p>
+        </article>
+        <article class="network-empty-card">
+          <h2 class="network-empty-card-title">Provisionamento aguardando</h2>
+          <p class="network-empty-card-text">As atribuições de rede dependem de um dispositivo operacional.</p>
+        </article>
+        <article class="network-empty-card">
+          <h2 class="network-empty-card-title">Monitoramento pendente</h2>
+          <p class="network-empty-card-text">O status Zabbix será exibido após o primeiro host monitorado.</p>
+        </article>
+      </section>
+      {% endif %}
+
+      <div id="filter-container"></div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2 class="network-content-title">Inventário de dispositivos</h2>
+            <p class="network-content-subtitle">Consulte conexões, monitore Zabbix e mantenha os dados técnicos atualizados.</p>
+          </div>
+          <span class="status-indicator secondary"><span class="status-dot" aria-hidden="true"></span>{{ total_devices }} registro{{ '' if total_devices == 1 else 's' }}</span>
+        </div>
+        <div class="card-body">
+          <div id="table-container"></div>
+        </div>
       </div>
-
-      <!-- Device Modal -->
-      <div id="deviceModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-              <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="ISP_ERP.closeModal('deviceModal')"></div>
-              <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <div class="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                  <form method="POST" action="{{ url_for('admin_network_devices') }}">
-                      <input type="hidden" name="id" id="deviceId">
-                      <div class="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                          <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4" id="modalTitle">
-                              Novo Dispositivo
-                          </h3>
-                          <div class="grid grid-cols-1 gap-4">
-                              <div>
-                                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Nome</label>
-                                  <input type="text" name="name" id="deviceName" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                              </div>
-                              <div class="grid grid-cols-2 gap-4">
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Tipo</label>
-                                      <select name="type" id="deviceType" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                          <option value="router">Roteador</option>
-                                          <option value="olt">OLT</option>
-                                          <option value="switch">Switch</option>
-                                      </select>
-                                  </div>
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Fabricante</label>
-                                      <select name="vendor" id="deviceVendor" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                          <option value="mikrotik">Mikrotik</option>
-                                          <option value="huawei">Huawei</option>
-                                          <option value="zte">ZTE</option>
-                                          <option value="vsol">V-SOL</option>
-                                          <option value="generic">Genérico</option>
-                                      </select>
-                                  </div>
-                              </div>
-                              <div class="grid grid-cols-2 gap-4">
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">IP / Host</label>
-                                      <input type="text" name="host" id="deviceHost" required class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                  </div>
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Porta API</label>
-                                      <input type="number" name="port" id="devicePort" value="8728" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                  </div>
-                              </div>
-                              <div class="grid grid-cols-2 gap-4">
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Usuário</label>
-                                      <input type="text" name="username" id="deviceUsername" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                  </div>
-                                  <div>
-                                      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Senha</label>
-                                      <input type="password" name="password" id="devicePassword" class="mt-1 w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                                  </div>
-                              </div>
-                              <div class="flex items-center">
-                                  <input type="checkbox" name="enabled" id="deviceEnabled" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
-                                  <label for="deviceEnabled" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
-                                      Dispositivo Ativo
-                                  </label>
-                              </div>
-                          </div>
-                      </div>
-                      <div class="bg-gray-50 dark:bg-gray-700/50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                          <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm">
-                              Salvar
-                          </button>
-                          <button type="button" onclick="ISP_ERP.closeModal('deviceModal')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-gray-800 text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
-                              Cancelar
-                          </button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      </div>
-
+      <div id="pagination-container"></div>
     </div>
   </main>
+
+  <div id="modal-device" class="modal-overlay" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modal-title">Novo dispositivo</h2>
+        <button type="button" class="modal-close" aria-label="Fechar modal" data-modal-close>×</button>
+      </div>
+      <div class="modal-body">
+        <form id="form-device" method="post" action="{{ url_for('admin_network_devices') }}" data-validate>
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}" />
+          <input type="hidden" name="id" id="device-id" />
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="device-name" class="form-label required">Nome</label>
+              <input type="text" id="device-name" name="name" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label for="device-host" class="form-label required">IP / Host</label>
+              <input type="text" id="device-host" name="host" class="form-control" required />
+            </div>
+            <div class="form-group">
+              <label for="device-type" class="form-label required">Tipo</label>
+              <select id="device-type" name="type" class="form-control" required>
+                <option value="router">Roteador</option>
+                <option value="bras">BRAS</option>
+                <option value="olt">OLT</option>
+                <option value="switch">Switch</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="device-vendor" class="form-label required">Fabricante</label>
+              <select id="device-vendor" name="vendor" class="form-control" required>
+                <option value="mikrotik">Mikrotik</option>
+                <option value="huawei">Huawei</option>
+                <option value="zte">ZTE</option>
+                <option value="vsol">V-SOL</option>
+                <option value="cisco">Cisco</option>
+                <option value="juniper">Juniper</option>
+                <option value="generic">Genérico</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="device-port" class="form-label required">Porta</label>
+              <input type="number" id="device-port" name="port" class="form-control" min="1" max="65535" value="8728" required />
+            </div>
+            <div class="form-group">
+              <label for="device-username" class="form-label">Usuário</label>
+              <input type="text" id="device-username" name="username" class="form-control" autocomplete="off" />
+            </div>
+            <div class="form-group">
+              <label for="device-password" class="form-label">Senha</label>
+              <input type="password" id="device-password" name="password" class="form-control" autocomplete="new-password" />
+            </div>
+          </div>
+
+          <div class="form-check">
+            <input type="checkbox" name="enabled" id="device-enabled" class="form-check-input" />
+            <label for="device-enabled" class="form-check-label">Dispositivo ativo</label>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="zabbix_monitored" id="device-zabbix-monitored" class="form-check-input" />
+            <label for="device-zabbix-monitored" class="form-check-label">Sincronizar com Zabbix</label>
+          </div>
+          <div class="form-group">
+            <label for="device-zabbix-snmp-community" class="form-label">Community SNMP</label>
+            <input type="text" name="zabbix_snmp_community" id="device-zabbix-snmp-community" class="form-control" placeholder="Usar padrão do setup" />
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-modal-close>Cancelar</button>
+        <button type="submit" form="form-device" class="btn btn-primary">Salvar</button>
+      </div>
+    </div>
+  </div>
 
   {% include 'components/footer.html' %}
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
@@ -224,85 +439,228 @@
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 
   <script>
-    function openDeviceModal() {
-        document.getElementById('deviceId').value = '';
-        document.getElementById('modalTitle').textContent = 'Novo Dispositivo';
-        document.getElementById('deviceName').value = '';
-        document.getElementById('deviceType').value = 'router';
-        document.getElementById('deviceVendor').value = 'mikrotik';
-        document.getElementById('deviceHost').value = '';
-        document.getElementById('devicePort').value = '8728';
-        document.getElementById('deviceUsername').value = '';
-        document.getElementById('devicePassword').value = '';
-        document.getElementById('deviceEnabled').checked = true;
-        
-        ISP_ERP.openModal('deviceModal');
+    const csrfToken = {{ csrf_token | tojson }};
+    const initialFilters = {
+      name: {{ (request.args.get('name') or '') | tojson }},
+      type: {{ (request.args.get('type') or '') | tojson }},
+      vendor: {{ (request.args.get('vendor') or '') | tojson }}
+    };
+    const devices = [
+      {% for item in items %}
+      {
+        id: {{ item.id }},
+        name: {{ item.name | tojson }},
+        type: {{ item.type | tojson }},
+        vendor: {{ item.vendor | tojson }},
+        host: {{ item.host | tojson }},
+        port: {{ item.port }},
+        username: {{ item.username | tojson }},
+        enabled: {{ item.enabled | tojson }},
+        zabbix_monitored: {{ item.zabbix_monitored | tojson }},
+        zabbix_host_id: {{ (item.zabbix_host_id or '') | tojson }},
+        zabbix_snmp_community: {{ (item.zabbix_snmp_community or '') | tojson }},
+        endpoint: {{ (item.host ~ ':' ~ item.port) | tojson }}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
+    ];
+
+    function statusBadge(enabled) {
+      const status = enabled ? 'active' : 'inactive';
+      return `<span class="status-indicator ${enabled ? 'success' : 'danger'}"><span class="status-dot" aria-hidden="true"></span>${enabled ? 'Ativo' : 'Inativo'}</span>`;
     }
 
-    function editDevice(id, name, type, vendor, host, port, username, password, enabled) {
-        document.getElementById('deviceId').value = id;
-        document.getElementById('modalTitle').textContent = 'Editar Dispositivo';
-        document.getElementById('deviceName').value = name;
-        document.getElementById('deviceType').value = type;
-        document.getElementById('deviceVendor').value = vendor;
-        document.getElementById('deviceHost').value = host;
-        document.getElementById('devicePort').value = port;
-        document.getElementById('deviceUsername').value = username;
-        // Password field left empty for security, only update if entered
-        document.getElementById('devicePassword').value = ''; 
-        document.getElementById('deviceEnabled').checked = enabled;
-        
-        ISP_ERP.openModal('deviceModal');
+    function zabbixBadge(row) {
+      if (!row.zabbix_monitored) {
+        return '<span class="status-indicator secondary"><span class="status-dot" aria-hidden="true"></span>Não monitorado</span>';
+      }
+      const label = row.zabbix_host_id ? `Zabbix #${row.zabbix_host_id}` : 'Pendente';
+      return `<span class="status-indicator ${row.zabbix_host_id ? 'success' : 'warning'}"><span class="status-dot" aria-hidden="true"></span>${label}</span>`;
     }
 
-    async function deleteDevice(id) {
-        if (!confirm('Tem certeza que deseja excluir este dispositivo?')) return;
-        
-        try {
-            const response = await fetch(`/admin/network/devices/${id}/delete`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                window.location.reload();
-            } else {
-                alert('Erro ao excluir dispositivo');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-            alert('Erro ao excluir dispositivo');
+    function defaultPortFor(type, vendor) {
+      if (vendor === 'mikrotik') return 8728;
+      if (type === 'olt' || ['huawei', 'zte', 'vsol'].includes(vendor)) return 23;
+      return 8728;
+    }
+
+    function resetDeviceForm() {
+      const form = document.getElementById('form-device');
+      form.reset();
+      document.getElementById('device-id').value = '';
+      document.getElementById('modal-title').textContent = 'Novo dispositivo';
+      document.getElementById('device-type').value = 'router';
+      document.getElementById('device-vendor').value = 'mikrotik';
+      document.getElementById('device-port').value = '8728';
+      document.getElementById('device-enabled').checked = true;
+      document.getElementById('device-zabbix-monitored').checked = false;
+      document.getElementById('device-zabbix-snmp-community').value = '';
+    }
+
+    function editDevice(row) {
+      document.getElementById('device-id').value = row.id;
+      document.getElementById('modal-title').textContent = 'Editar dispositivo';
+      document.getElementById('device-name').value = row.name || '';
+      document.getElementById('device-type').value = row.type || 'router';
+      document.getElementById('device-vendor').value = row.vendor || 'generic';
+      document.getElementById('device-host').value = row.host || '';
+      document.getElementById('device-port').value = row.port || defaultPortFor(row.type, row.vendor);
+      document.getElementById('device-username').value = row.username || '';
+      document.getElementById('device-password').value = '';
+      document.getElementById('device-enabled').checked = Boolean(row.enabled);
+      document.getElementById('device-zabbix-monitored').checked = Boolean(row.zabbix_monitored);
+      document.getElementById('device-zabbix-snmp-community').value = row.zabbix_snmp_community || '';
+      ISP_ERP.openModal('modal-device');
+    }
+
+    function applyFilters(filters) {
+      const params = new URLSearchParams(window.location.search);
+      Object.keys(filters).forEach(key => {
+        if (filters[key]) params.set(key, filters[key]);
+        else params.delete(key);
+      });
+      window.location.search = params.toString();
+    }
+
+    async function postJson(url) {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRF-Token': csrfToken
         }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.success === false) {
+        throw new Error(data.error || data.message || 'Operação não concluída');
+      }
+      return data;
     }
 
-    async function testConnection(id) {
+    async function deleteDevice(row) {
+      ISP_ERP.confirm(`Excluir dispositivo "${row.name}"?`, async confirmed => {
+        if (!confirmed) return;
         try {
-            const btn = event.currentTarget;
-            const icon = btn.querySelector('i');
-            const originalClass = icon.className;
-            
-            icon.className = 'fas fa-spinner fa-spin';
-            
-            const response = await fetch(`/admin/network/devices/${id}/test`, {
-                method: 'POST'
-            });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                alert('Conexão realizada com sucesso!');
-            } else {
-                alert('Erro na conexão: ' + data.message);
-            }
-            
-            icon.className = originalClass;
+          await postJson(`/admin/network/devices/${row.id}/delete`);
+          ISP_AdvancedComponents.Toast.success('Dispositivo excluído');
+          window.location.reload();
         } catch (error) {
-            console.error('Error:', error);
-            alert('Erro ao testar conexão');
+          ISP_AdvancedComponents.Toast.error(error.message);
         }
+      });
     }
+
+    async function testConnection(row) {
+      try {
+        const data = await postJson(`/admin/network/devices/${row.id}/test`);
+        ISP_AdvancedComponents.Toast.success(data.message || 'Conexão realizada com sucesso');
+      } catch (error) {
+        ISP_AdvancedComponents.Toast.error(error.message);
+      }
+    }
+
+    async function checkZabbixStatus(row) {
+      if (!row.zabbix_monitored) {
+        ISP_AdvancedComponents.Toast.info('Dispositivo não monitorado no Zabbix');
+        return;
+      }
+      try {
+        const response = await fetch(`/admin/network/devices/${row.id}/zabbix-status`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        const data = await response.json();
+        if (data.error) {
+          ISP_AdvancedComponents.Toast.error(data.error);
+          return;
+        }
+        if (!data.configured) {
+          ISP_AdvancedComponents.Toast.warning(data.message || 'Zabbix não configurado');
+          return;
+        }
+        if (!data.found) {
+          ISP_AdvancedComponents.Toast.warning(data.message || 'Host não encontrado no Zabbix');
+          return;
+        }
+        const enabled = data.enabled ? 'habilitado' : 'desabilitado';
+        const snmp = data.snmp_available ? 'SNMP online' : 'SNMP indisponível';
+        const agent = data.agent_available ? 'Agent online' : 'Agent indisponível';
+        ISP_AdvancedComponents.Toast.info(`Zabbix #${data.host_id}: ${enabled}, ${snmp}, ${agent}`);
+      } catch (error) {
+        ISP_AdvancedComponents.Toast.error('Erro ao consultar status Zabbix');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      const filterPanel = new ISP_Components.FilterPanel({
+        container: '#filter-container',
+        filters: [
+          { type: 'text', name: 'name', label: 'Nome', placeholder: 'Nome do dispositivo' },
+          { type: 'select', name: 'type', label: 'Tipo', options: [
+            { value: 'router', label: 'Roteador' },
+            { value: 'bras', label: 'BRAS' },
+            { value: 'olt', label: 'OLT' },
+            { value: 'switch', label: 'Switch' }
+          ]},
+          { type: 'select', name: 'vendor', label: 'Fabricante', options: [
+            { value: 'mikrotik', label: 'Mikrotik' },
+            { value: 'huawei', label: 'Huawei' },
+            { value: 'zte', label: 'ZTE' },
+            { value: 'vsol', label: 'V-SOL' },
+            { value: 'cisco', label: 'Cisco' },
+            { value: 'juniper', label: 'Juniper' },
+            { value: 'generic', label: 'Genérico' }
+          ]}
+        ],
+        onApply: applyFilters,
+        onReset: () => { window.location.href = window.location.pathname; }
+      });
+      filterPanel.setValues(initialFilters);
+
+      new ISP_Components.DataTable({
+        container: '#table-container',
+        columns: [
+          { field: 'id', label: 'ID', sortable: true, render: value => `#${value}` },
+          { field: 'name', label: 'Nome', sortable: true },
+          { field: 'type', label: 'Tipo', sortable: true, render: value => String(value || '').toUpperCase() },
+          { field: 'vendor', label: 'Fabricante', sortable: true, render: value => String(value || '').toUpperCase() },
+          { field: 'endpoint', label: 'Endpoint', sortable: false },
+          { field: 'enabled', label: 'Status', sortable: true, render: statusBadge },
+          { field: 'zabbix_monitored', label: 'Zabbix', sortable: true, render: (_value, row) => zabbixBadge(row) }
+        ],
+        data: devices,
+        actions: [
+          { name: 'test', label: 'Testar', icon: '↔', showLabel: false, handler: testConnection },
+          { name: 'zabbix', label: 'Zabbix', icon: '◉', showLabel: false, handler: checkZabbixStatus },
+          { name: 'edit', label: 'Editar', icon: '✎', showLabel: false, handler: editDevice },
+          { name: 'delete', label: 'Excluir', icon: '×', variant: 'danger', showLabel: false, handler: deleteDevice }
+        ],
+        emptyMessage: 'Nenhum dispositivo encontrado'
+      });
+
+      new ISP_Components.Pagination({
+        container: '#pagination-container',
+        total: devices.length,
+        currentPage: 1,
+        pageSize: 10
+      });
+
+      document.querySelectorAll('[data-modal-target="modal-device"]').forEach(button => {
+        button.addEventListener('click', () => {
+          resetDeviceForm();
+          ISP_ERP.openModal('modal-device');
+        });
+      });
+      document.querySelectorAll('[data-modal-close]').forEach(button => {
+        button.addEventListener('click', () => ISP_ERP.closeModal('modal-device'));
+      });
+      document.getElementById('device-type').addEventListener('change', event => {
+        const vendor = document.getElementById('device-vendor').value;
+        document.getElementById('device-port').value = defaultPortFor(event.target.value, vendor);
+      });
+      document.getElementById('device-vendor').addEventListener('change', event => {
+        const type = document.getElementById('device-type').value;
+        document.getElementById('device-port').value = defaultPortFor(type, event.target.value);
+      });
+    });
   </script>
 </body>
 </html>

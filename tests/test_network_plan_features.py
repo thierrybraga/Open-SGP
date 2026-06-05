@@ -68,7 +68,27 @@ def test_zabbix_templates_are_resolved_by_name():
     assert "DEFAULT_TEMPLATE_MAP" in zabbix_sync
     assert "template_map" in zabbix_sync
     assert "get_template_ids_by_names" in zabbix_vendor
+    assert "sync_host" in zabbix_vendor
+    assert "hostinterface.update" in zabbix_vendor
+    assert "host.update" in zabbix_vendor
+    assert "disable_host" in zabbix_vendor
+    assert "get_host_status" in zabbix_vendor
+    assert "_snmp_community_for_device" in zabbix_sync
     assert "TODO" not in zabbix_sync
+
+
+def test_zabbix_admin_exposes_status_and_per_device_snmp_community():
+    admin = _read("admin_panel/app.py")
+    template = _read("admin_panel/templates/admin_network_devices.html")
+    models = _read("app/modules/network/models.py")
+    migration = _read("alembic/versions/0035_zabbix_device_snmp.py")
+
+    assert "zabbix_snmp_community" in models
+    assert "zabbix_snmp_community" in migration
+    assert "get_device_zabbix_status" in admin
+    assert "/zabbix-status" in admin
+    assert "zabbix_snmp_community" in template
+    assert "checkZabbixStatus" in template
 
 
 def test_plan_changes_sync_service_profile_and_radius_template():
@@ -108,6 +128,21 @@ def test_billing_blocking_respects_contract_suspension_flag_and_updates_status()
     assert "except Exception" not in block_contract
     assert "except Exception" not in unblock_contract
     assert "except Exception" not in unbind_vlan
+
+
+def test_blocked_contract_admin_uses_assignment_static_ip_and_suspended_status():
+    admin = _read("admin_panel/app.py")
+
+    assert '"ip_address": a.static_ip' in admin
+    assert "Contract.status == 'suspended'" in admin
+    assert "Contract.status == 'blocked'" not in admin
+
+
+def test_radius_unblock_removes_any_explicit_auth_reject():
+    radius = _function_source("app/modules/network/vendors/radius.py", "unblock_user")
+
+    assert 'RadCheck.attribute == "Auth-Type"' in radius
+    assert 'RadCheck.value == "Reject"' not in radius
 
 
 def test_contract_update_allows_validated_plan_change():

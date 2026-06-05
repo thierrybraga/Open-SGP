@@ -35,6 +35,7 @@ class NetworkDevice(Base, TimestampMixin):
     # Zabbix Integration
     zabbix_monitored: Mapped[bool] = mapped_column(Boolean, default=False)
     zabbix_host_id: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    zabbix_snmp_community: Mapped[str | None] = mapped_column(String(100), nullable=True)
 
 
 class VLAN(Base, TimestampMixin):

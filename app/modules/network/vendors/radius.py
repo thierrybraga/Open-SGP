@@ -16,6 +16,10 @@ import socket
 import struct
 import hashlib
 import random
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 class RadiusClient:
     def __init__(self, db: Session):
@@ -170,15 +174,16 @@ class RadiusClient:
         packet = header_no_auth + authenticator + attributes
         
         # Send
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             sock.settimeout(2)
             sock.sendto(packet, (nas_ip, 3799)) # Port 3799 is standard for CoA
-            sock.close()
             return True
         except Exception as e:
-            print(f"Error sending CoA to {nas_ip}: {e}")
+            logger.warning("Error sending RADIUS CoA to %s: %s", nas_ip, e)
             return False
+        finally:
+            sock.close()
 
     def disconnect_user(self, username: str):
         """
@@ -214,11 +219,10 @@ class RadiusClient:
         return True
 
     def unblock_user(self, username: str):
-        """Desbloqueia usuário (Remove Auth-Type := Reject)"""
+        """Desbloqueia usuário removendo qualquer rejeição explícita."""
         self.db.query(RadCheck).filter(
             RadCheck.username == username,
-            RadCheck.attribute == "Auth-Type",
-            RadCheck.value == "Reject"
+            RadCheck.attribute == "Auth-Type"
         ).delete()
         self.db.commit()
         return True

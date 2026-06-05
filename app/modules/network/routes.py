@@ -88,7 +88,10 @@ def list_pools(db: Session = Depends(get_db)):
 
 @router.post("/pools", response_model=IPPoolOut, dependencies=[Depends(require_permissions("network.pools.create"))])
 def create_pool_endpoint(data: IPPoolCreate, db: Session = Depends(get_db)):
-    p = create_pool(db, data)
+    try:
+        p = create_pool(db, data)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     return IPPoolOut(**p.__dict__)
 
 

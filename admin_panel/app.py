@@ -28,8 +28,13 @@ from app.modules.network.service import (
     sync_billing_blocking,
     get_radius_active_session,
     get_radius_usage_history,
-    test_device_connection
+    test_device_connection,
+    create_pool,
+    _normalize_pool_cidr,
+    _validate_pool_settings,
 )
+from app.modules.network.schemas import IPPoolCreate
+from app.modules.network.zabbix_sync import get_device_zabbix_status, sync_device_to_zabbix
 from app.modules.administration.pops.models import POP
 from app.modules.administration.nas.models import NAS
 from app.modules.administration.variables.models import SystemVariable
@@ -1530,31 +1535,47 @@ def create_app() -> Flask:
         db = SessionLocal()
         if request.method == "POST":
             dev_id = request.form.get("id")
+            try:
+                port = int(request.form.get("port") or 8728)
+            except ValueError:
+                port = 8728
+            enabled = request.form.get("enabled") == "on"
+            zabbix_monitored = request.form.get("zabbix_monitored") == "on"
+            zabbix_snmp_community = (request.form.get("zabbix_snmp_community") or "").strip() or None
+            dev = None
             if dev_id:
                 dev = db.query(NetworkDevice).filter(NetworkDevice.id == int(dev_id)).first()
                 if dev:
-                    dev.name = request.form.get("name") or dev.name
-                    dev.type = request.form.get("type") or dev.type
-                    dev.vendor = request.form.get("vendor") or dev.vendor
-                    dev.host = request.form.get("host") or dev.host
-                    dev.port = int(request.form.get("port") or 8728)
-                    dev.username = request.form.get("username") or dev.username
+                    dev.name = (request.form.get("name") or dev.name).strip()
+                    dev.type = (request.form.get("type") or dev.type).strip().lower()
+                    dev.vendor = (request.form.get("vendor") or dev.vendor).strip().lower()
+                    dev.host = (request.form.get("host") or dev.host).strip()
+                    dev.port = port
+                    dev.username = (request.form.get("username") or dev.username).strip()
                     if request.form.get("password"):
                         dev.password = request.form.get("password")
-                    dev.enabled = request.form.get("enabled") == "on"
+                    dev.enabled = enabled
+                    dev.zabbix_monitored = zabbix_monitored
+                    dev.zabbix_snmp_community = zabbix_snmp_community
             else:
                 dev = NetworkDevice(
-                    name=request.form.get("name") or "",
-                    type=request.form.get("type") or "router",
-                    vendor=request.form.get("vendor") or "generic",
-                    host=request.form.get("host") or "",
-                    port=int(request.form.get("port") or 8728),
-                    username=request.form.get("username") or "",
+                    name=(request.form.get("name") or "").strip(),
+                    type=(request.form.get("type") or "router").strip().lower(),
+                    vendor=(request.form.get("vendor") or "generic").strip().lower(),
+                    host=(request.form.get("host") or "").strip(),
+                    port=port,
+                    username=(request.form.get("username") or "").strip(),
                     password=request.form.get("password") or "",
-                    enabled=request.form.get("enabled") == "on",
+                    enabled=enabled,
+                    zabbix_monitored=zabbix_monitored,
+                    zabbix_snmp_community=zabbix_snmp_community,
                 )
                 db.add(dev)
-            db.commit()
+            if dev:
+                db.commit()
+                db.refresh(dev)
+                if dev.zabbix_monitored or dev.zabbix_host_id:
+                    sync_device_to_zabbix(db, dev.id)
         
         q = db.query(NetworkDevice)
         name = request.args.get("name")
@@ -1566,7 +1587,7 @@ def create_app() -> Flask:
         if type_:
             q = q.filter(NetworkDevice.type == type_)
         if vendor:
-            q = q.filter(NetworkDevice.vendor.ilike(f"%{vendor}%"))
+            q = q.filter(NetworkDevice.vendor == vendor)
             
         items = q.order_by(NetworkDevice.created_at.desc()).limit(100).all()
         try:
@@ -1582,7 +1603,7 @@ def create_app() -> Flask:
             if dev:
                 db.delete(dev)
                 db.commit()
-                return {"success": True}
+                return {"success": True, "message": "Dispositivo excluído"}
             return {"success": False, "error": "Dispositivo não encontrado"}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -1596,9 +1617,19 @@ def create_app() -> Flask:
             success = test_device_connection(db, device_id)
             if success:
                 return {"success": True, "message": "Conexão bem-sucedida!"}
-            return {"success": False, "error": "Falha na conexão"}
+            return {"success": False, "message": "Falha na conexão", "error": "Falha na conexão"}
         except Exception as e:
             return {"success": False, "error": str(e)}
+        finally:
+            db.close()
+
+    @app.route("/admin/network/devices/<int:device_id>/zabbix-status", methods=["GET"])
+    def admin_network_devices_zabbix_status(device_id: int):
+        db = SessionLocal()
+        try:
+            return get_device_zabbix_status(db, device_id)
+        except Exception as e:
+            return {"configured": False, "found": False, "error": str(e)}
         finally:
             db.close()
 
@@ -1674,32 +1705,39 @@ def create_app() -> Flask:
     def admin_network_pools():
         db = SessionLocal()
         if request.method == "POST":
-            pool_id = request.form.get("id")
-            if pool_id:
-                pool = db.query(IPPool).filter(IPPool.id == int(pool_id)).first()
-                if pool:
-                    pool.name = request.form.get("name") or pool.name
-                    pool.cidr = request.form.get("cidr") or pool.cidr
-                    pool.type = request.form.get("type") or pool.type
-                    pool.gateway = request.form.get("gateway") or pool.gateway
-                    pool.dns_primary = request.form.get("dns_primary") or pool.dns_primary
-                    pool.dns_secondary = request.form.get("dns_secondary") or pool.dns_secondary
-                    pool.device_id = int(request.form.get("device_id")) if request.form.get("device_id") else None
-                    pool.vlan_id = int(request.form.get("vlan_id")) if request.form.get("vlan_id") else None
-                    db.commit()
-            else:
-                pool = IPPool(
-                    name=request.form.get("name") or "",
-                    cidr=request.form.get("cidr") or "",
-                    type=request.form.get("type") or "dynamic",
-                    gateway=request.form.get("gateway") or "",
-                    dns_primary=request.form.get("dns_primary") or "",
-                    dns_secondary=request.form.get("dns_secondary") or "",
-                    device_id=int(request.form.get("device_id")) if request.form.get("device_id") else None,
-                    vlan_id=int(request.form.get("vlan_id")) if request.form.get("vlan_id") else None,
+            try:
+                pool_id = request.form.get("id")
+                pool_data = {
+                    "name": (request.form.get("name") or "").strip(),
+                    "cidr": _normalize_pool_cidr(request.form.get("cidr") or ""),
+                    "type": request.form.get("type") or "dynamic",
+                    "gateway": (request.form.get("gateway") or "").strip(),
+                    "dns_primary": (request.form.get("dns_primary") or "").strip(),
+                    "dns_secondary": (request.form.get("dns_secondary") or "").strip(),
+                    "device_id": int(request.form.get("device_id")) if request.form.get("device_id") else None,
+                    "vlan_id": int(request.form.get("vlan_id")) if request.form.get("vlan_id") else None,
+                }
+                _validate_pool_settings(
+                    cidr=pool_data["cidr"],
+                    pool_type=pool_data["type"],
+                    gateway=pool_data["gateway"],
+                    dns_primary=pool_data["dns_primary"],
+                    dns_secondary=pool_data["dns_secondary"],
                 )
-                db.add(pool)
-                db.commit()
+                if pool_id:
+                    pool = db.query(IPPool).filter(IPPool.id == int(pool_id)).first()
+                    if pool:
+                        for field, value in pool_data.items():
+                            setattr(pool, field, value)
+                        db.commit()
+                        flash("Pool atualizado com sucesso.", "success")
+                else:
+                    create_pool(db, IPPoolCreate(**pool_data))
+                    flash("Pool criado com sucesso.", "success")
+            except Exception as e:
+                db.rollback()
+                flash(f"Erro ao salvar pool: {e}", "danger")
+            return redirect(url_for("admin_network_pools"))
         items = db.query(IPPool).options(joinedload(IPPool.device), joinedload(IPPool.vlan)).order_by(IPPool.created_at.desc()).limit(100).all()
         devices = db.query(NetworkDevice).order_by(NetworkDevice.name.asc()).all()
         vlans = db.query(VLAN).order_by(VLAN.vlan_id.asc()).all()
@@ -1876,7 +1914,7 @@ def create_app() -> Flask:
                 "id": a.id,
                 "contract_id": a.contract_id,
                 "status": a.status,
-                "ip_address": a.ip_address,
+                "ip_address": a.static_ip,
                 "mac_address": a.mac_address,
                 "updated_at": a.updated_at.isoformat() if a.updated_at else None
             })
@@ -3298,7 +3336,7 @@ def create_app() -> Flask:
             contracts_active = db.query(func.count(Contract.id)).filter(Contract.status == 'active').scalar() or 0
             
             # Contracts Blocked
-            contracts_blocked = db.query(func.count(Contract.id)).filter(Contract.status == 'blocked').scalar() or 0
+            contracts_blocked = db.query(func.count(Contract.id)).filter(Contract.status == 'suspended').scalar() or 0
             
             # NAS Count (Routers/Concentrators)
             nas_count = db.query(func.count(NetworkDevice.id)).filter(NetworkDevice.type.in_(['router', 'bras'])).scalar() or 0

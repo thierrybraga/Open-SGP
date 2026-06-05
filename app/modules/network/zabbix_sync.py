@@ -56,9 +56,9 @@ def sync_device_to_zabbix(db: Session, device_id: int):
     device = db.query(NetworkDevice).filter(NetworkDevice.id == device_id).first()
     if not device:
         return
-        
-    if not device.zabbix_monitored:
-        return
+
+    progress = db.query(SetupProgress).first()
+    config = (progress.get_config_data().get("monitoring", {}) if progress else {})
 
     client = get_zabbix_client(db)
     if not client:
@@ -69,9 +69,14 @@ def sync_device_to_zabbix(db: Session, device_id: int):
         # Checagem rápida de disponibilidade
         client.get_version()
         client.login()
+
+        if not device.zabbix_monitored:
+            if client.disable_host(host_id=device.zabbix_host_id, host_name=device.name):
+                logger.info("Device %s disabled in Zabbix", device.name)
+            return
         
         # 1. Garantir grupo
-        group_name = "ISP Devices"
+        group_name = config.get("device_group") or "ISP Devices"
         group_id = client.create_host_group(group_name)
         
         # 2. Definir templates baseados no vendor
@@ -79,11 +84,14 @@ def sync_device_to_zabbix(db: Session, device_id: int):
         templates = client.get_template_ids_by_names(template_names)
         
         # 3. Criar/Atualizar Host
-        host_id = client.create_host(
+        host_id = client.sync_host(
             host_name=device.name,
             ip=device.host,
             group_id=group_id,
-            template_ids=templates
+            host_id=device.zabbix_host_id,
+            template_ids=templates,
+            snmp_community=_snmp_community_for_device(config, device),
+            enabled=device.enabled,
         )
         
         # 4. Salvar ID no banco
@@ -107,3 +115,31 @@ def _template_names_for_device(config: dict, device: NetworkDevice) -> list[str]
     if isinstance(names, list):
         return [str(name) for name in names if name]
     return DEFAULT_TEMPLATE_MAP.get(vendor) or DEFAULT_TEMPLATE_MAP.get(device_type) or []
+
+
+def _snmp_community_for_device(config: dict, device: NetworkDevice) -> str | None:
+    if device.zabbix_snmp_community:
+        return device.zabbix_snmp_community
+    communities = config.get("snmp_communities") or {}
+    vendor = (device.vendor or "").lower()
+    device_type = (device.type or "").lower()
+    return communities.get(vendor) or communities.get(device_type) or config.get("snmp_community")
+
+
+def get_device_zabbix_status(db: Session, device_id: int) -> dict:
+    device = db.query(NetworkDevice).filter(NetworkDevice.id == device_id).first()
+    if not device:
+        raise ValueError("Device not found")
+    if not device.zabbix_monitored:
+        return {"configured": False, "message": "Device is not monitored"}
+
+    client = get_zabbix_client(db)
+    if not client:
+        return {"configured": False, "message": "Zabbix is not configured"}
+
+    client.get_version()
+    client.login()
+    status = client.get_host_status(host_id=device.zabbix_host_id, host_name=device.name)
+    if not status:
+        return {"configured": True, "found": False, "message": "Host not found in Zabbix"}
+    return {"configured": True, "found": True, **status}

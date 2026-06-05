@@ -12,6 +12,7 @@ Integrações:
 """
 
 from datetime import datetime
+from collections.abc import Iterable
 from sqlalchemy.orm import Session
 import ipaddress
 
@@ -24,6 +25,7 @@ from .models import (
     ContractTechHistory,
     IPLease,
     RadAcct,
+    RadIPPool,
 )
 from ..contracts.models import Contract
 from ..billing.models import Title
@@ -65,7 +67,16 @@ def create_vlan(db: Session, data: VLANCreate) -> VLAN:
 
 
 def create_pool(db: Session, data: IPPoolCreate) -> IPPool:
-    pool = IPPool(**data.dict())
+    values = data.dict()
+    values["cidr"] = _normalize_pool_cidr(values["cidr"])
+    _validate_pool_settings(
+        cidr=values["cidr"],
+        pool_type=values["type"],
+        gateway=values["gateway"],
+        dns_primary=values["dns_primary"],
+        dns_secondary=values["dns_secondary"],
+    )
+    pool = IPPool(**values)
     db.add(pool)
     db.commit()
     db.refresh(pool)
@@ -142,6 +153,42 @@ def _vendor_clients(device: NetworkDevice):
     return None
 
 
+def _radius_credentials_for_assignment(cna: ContractNetworkAssignment) -> tuple[str, str]:
+    username = cna.pppoe_user or str(cna.contract_id)
+    password = cna.pppoe_password or str(cna.contract_id)
+    return username, password
+
+
+def sync_radius_auth_for_assignment(
+    db: Session,
+    cna: ContractNetworkAssignment,
+    profile: ServiceProfile | None = None,
+    plan_group_name: str | None = None,
+) -> None:
+    """
+    Keep PPPoE/RADIUS authentication aligned with the contract assignment.
+
+    The access device can be an OLT, Mikrotik or BRAS, but authentication is
+    centralized in FreeRADIUS. This makes provisioning deterministic instead of
+    only creating RADIUS users when the selected network device is typed as BRAS.
+    """
+    prof = profile or cna.profile
+    if not prof:
+        return
+    username, password = _radius_credentials_for_assignment(cna)
+    RadiusClient(db).create_or_update_user(
+        username=username,
+        password=password,
+        plan_group_name=plan_group_name or prof.name,
+        download_mbps=prof.download_speed_mbps,
+        upload_mbps=prof.upload_speed_mbps,
+        burst_enabled=prof.burst_enabled,
+        burst_rate_percent=prof.burst_rate_percent,
+        burst_threshold_seconds=prof.burst_threshold_seconds,
+        ip_address=cna.static_ip,
+    )
+
+
 def test_device_connection(db: Session, device_id: int) -> bool:
     dev = db.query(NetworkDevice).filter(NetworkDevice.id == device_id).first()
     if not dev:
@@ -183,6 +230,9 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
             lease = allocate_dynamic_ip(db, cna.ip_pool.id, contract_id)
         if lease:
             cna.static_ip = lease.ip_address
+    if prof:
+        sync_radius_auth_for_assignment(db, cna, prof, plan_group_name=prof.name)
+
     if dev and prof:
         if dev.vendor == "mikrotik":
             mk = MikrotikClient(dev.host, dev.port, dev.username, dev.password)
@@ -206,22 +256,6 @@ def provision_contract(db: Session, contract_id: int) -> ContractNetworkAssignme
             )
             if cna.vlan:
                 olt.provision_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
-        elif dev.type == "bras":
-            # Use specific credentials if available, otherwise fallback to contract_id
-            u_user = cna.pppoe_user if cna.pppoe_user else str(contract_id)
-            u_pass = cna.pppoe_password if cna.pppoe_password else str(contract_id)
-            
-            RadiusClient(db).create_or_update_user(
-                username=u_user,
-                password=u_pass,
-                plan_group_name=prof.name,
-                download_mbps=prof.download_speed_mbps,
-                upload_mbps=prof.upload_speed_mbps,
-                burst_enabled=prof.burst_enabled,
-                burst_rate_percent=prof.burst_rate_percent,
-                burst_threshold_seconds=prof.burst_threshold_seconds,
-                ip_address=cna.static_ip,
-            )
     cna.last_provisioned_at = datetime.utcnow()
     db.add(cna)
     db.commit()
@@ -235,6 +269,8 @@ def block_contract(db: Session, contract_id: int) -> ContractNetworkAssignment:
     if not cna:
         raise ValueError("Assignment not found")
     dev = cna.device
+    username, _password = _radius_credentials_for_assignment(cna)
+    RadiusClient(db).block_user(username)
     if dev:
         client = _vendor_clients(dev)
         if dev.vendor == "mikrotik":
@@ -249,9 +285,6 @@ def block_contract(db: Session, contract_id: int) -> ContractNetworkAssignment:
             if cna.vlan:
                 olt.unbind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
             _write_history(db, contract_id, "block", f"OLT {dev.vendor}: perfil removido")
-        elif dev.type == "bras":
-            username = cna.pppoe_user if cna.pppoe_user else str(contract_id)
-            RadiusClient(db).block_user(username)
     cna.status = "blocked"
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if contract and contract.status != "canceled":
@@ -303,6 +336,10 @@ def unblock_contract(db: Session, contract_id: int) -> ContractNetworkAssignment
     if not cna:
         raise ValueError("Assignment not found")
     dev = cna.device
+    username, _password = _radius_credentials_for_assignment(cna)
+    RadiusClient(db).unblock_user(username)
+    if cna.profile:
+        sync_radius_auth_for_assignment(db, cna, cna.profile)
     if dev:
         client = _vendor_clients(dev)
         if dev.vendor == "mikrotik":
@@ -319,9 +356,6 @@ def unblock_contract(db: Session, contract_id: int) -> ContractNetworkAssignment
             if cna.vlan:
                 olt.bind_vlan(onu_id=str(contract_id), vlan_id=cna.vlan.vlan_id)
             _write_history(db, contract_id, "unblock", f"OLT {dev.vendor}: perfil/vlan aplicados")
-        elif dev.type == "bras":
-            username = cna.pppoe_user if cna.pppoe_user else str(contract_id)
-            RadiusClient(db).unblock_user(username)
     cna.status = "active"
     contract = db.query(Contract).filter(Contract.id == contract_id).first()
     if contract and contract.status == "suspended":
@@ -358,22 +392,94 @@ def sync_billing_blocking(db: Session, contract_id: int) -> ContractNetworkAssig
         return unblock_contract(db, contract_id)
 
 
-def _pool_ips(cidr: str) -> list[str]:
+def _normalize_pool_cidr(cidr: str) -> str:
+    try:
+        net = ipaddress.ip_network((cidr or "").strip(), strict=False)
+    except ValueError as exc:
+        raise ValueError("Invalid pool CIDR") from exc
+    if net.version != 4:
+        raise ValueError("Only IPv4 pools are supported")
+    if next(net.hosts(), None) is None:
+        raise ValueError("Pool CIDR has no usable host addresses")
+    return str(net)
+
+
+def _validate_ip(value: str, field_name: str) -> ipaddress.IPv4Address:
+    try:
+        ip = ipaddress.ip_address((value or "").strip())
+    except ValueError as exc:
+        raise ValueError(f"Invalid {field_name}") from exc
+    if ip.version != 4:
+        raise ValueError(f"{field_name} must be IPv4")
+    return ip
+
+
+def _validate_pool_settings(
+    cidr: str,
+    pool_type: str,
+    gateway: str,
+    dns_primary: str,
+    dns_secondary: str,
+) -> None:
+    if pool_type not in {"dynamic", "static", "cgnat"}:
+        raise ValueError("Invalid pool type")
     net = ipaddress.ip_network(cidr, strict=False)
-    ips = [str(ip) for ip in net.hosts()]
-    return ips
+    gateway_ip = _validate_ip(gateway, "gateway")
+    if gateway_ip not in net:
+        raise ValueError("Gateway must belong to the pool CIDR")
+    _validate_ip(dns_primary, "primary DNS")
+    _validate_ip(dns_secondary, "secondary DNS")
+
+
+def _pool_ips(cidr: str) -> Iterable[str]:
+    net = ipaddress.ip_network(cidr, strict=False)
+    return (str(ip) for ip in net.hosts())
+
+
+def _radius_pool_name(pool: IPPool) -> str:
+    return f"sgp_pool_{pool.id}"
+
+
+def _reserve_radius_pool_ip(db: Session, pool: IPPool, lease: IPLease) -> None:
+    item = db.query(RadIPPool).filter(RadIPPool.framedipaddress == lease.ip_address).first()
+    if not item:
+        item = RadIPPool(framedipaddress=lease.ip_address)
+        db.add(item)
+    item.pool_name = _radius_pool_name(pool)
+    item.nasipaddress = pool.device.host if pool.device else ""
+    item.calledstationid = ""
+    item.callingstationid = ""
+    item.expiry_time = None
+    item.username = str(lease.contract_id or "")
+    item.pool_key = f"lease:{lease.id}"
+
+
+def _release_radius_pool_ip(db: Session, lease: IPLease) -> None:
+    item = db.query(RadIPPool).filter(RadIPPool.framedipaddress == lease.ip_address).first()
+    if item:
+        item.username = ""
+        item.pool_key = ""
+        item.expiry_time = datetime.utcnow()
+        db.add(item)
 
 
 def allocate_dynamic_ip(db: Session, pool_id: int, contract_id: int) -> IPLease:
     pool = db.query(IPPool).filter(IPPool.id == pool_id).first()
     if not pool:
         raise ValueError("Pool not found")
+    if pool.type != "dynamic":
+        raise ValueError("IP allocation requires a dynamic pool")
+    active_lease = db.query(IPLease).filter(IPLease.contract_id == contract_id, IPLease.status == "allocated").first()
+    if active_lease:
+        return active_lease
     used = {l.ip_address for l in db.query(IPLease).filter(IPLease.pool_id == pool_id, IPLease.status == "allocated").all()}
     for ip in _pool_ips(pool.cidr):
         if ip in used:
             continue
         lease = IPLease(pool_id=pool_id, contract_id=contract_id, ip_address=ip, allocated_at=datetime.utcnow(), status="allocated")
         db.add(lease)
+        db.flush()
+        _reserve_radius_pool_ip(db, pool, lease)
         db.commit()
         db.refresh(lease)
         _write_history(db, contract_id, "ip_allocate", f"IP {ip} alocado do pool {pool.name}")
@@ -388,6 +494,7 @@ def release_ip_for_contract(db: Session, contract_id: int) -> IPLease | None:
     lease.status = "released"
     lease.released_at = datetime.utcnow()
     db.add(lease)
+    _release_radius_pool_ip(db, lease)
     db.commit()
     _write_history(db, contract_id, "ip_release", f"IP {lease.ip_address} liberado")
     return lease

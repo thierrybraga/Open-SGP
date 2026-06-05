@@ -23,6 +23,7 @@ class DeviceCreate(BaseModel):
     password: str
     enabled: bool = True
     zabbix_monitored: bool = False
+    zabbix_snmp_community: Optional[str] = None
 
 class DeviceOut(BaseModel):
     id: int
@@ -34,6 +35,7 @@ class DeviceOut(BaseModel):
     enabled: bool
     zabbix_monitored: bool
     zabbix_host_id: Optional[str] = None
+    zabbix_snmp_community: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -111,6 +113,11 @@ class AssignmentCreate(BaseModel):
     ip_pool_id: Optional[int] = None
     vlan_id: Optional[int] = None
     profile_id: Optional[int] = None
+    pppoe_user: Optional[str] = None
+    pppoe_password: Optional[str] = None
+    mac_address: Optional[str] = None
+    wifi_ssid: Optional[str] = None
+    wifi_password: Optional[str] = None
     static_ip: Optional[str] = None
     cgnat: bool = False
 
@@ -122,6 +129,11 @@ class AssignmentOut(BaseModel):
     ip_pool_id: Optional[int]
     vlan_id: Optional[int]
     profile_id: Optional[int]
+    pppoe_user: Optional[str] = None
+    pppoe_password: Optional[str] = None
+    mac_address: Optional[str] = None
+    wifi_ssid: Optional[str] = None
+    wifi_password: Optional[str] = None
     static_ip: Optional[str]
     cgnat: bool
     status: str
