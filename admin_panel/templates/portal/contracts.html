@@ -28,13 +28,13 @@ Responsabilidade: Visualização de Contratos do Cliente
             <tr>
                 <td>{{ contract.id }}</td>
                 <td>{{ contract.plan.name if contract.plan else '-' }}</td>
-                <td>R$ {{ "%.2f"|format(contract.amount) }}</td>
+                <td>R$ {{ "%.2f"|format(contract.price_override if contract.price_override is not none else (contract.plan.price if contract.plan else 0)) }}</td>
                 <td>
                     <span class="status-badge {{ 'status-success' if contract.status == 'active' else 'status-danger' }}">
                         {{ contract.status }}
                     </span>
                 </td>
-                <td>{{ contract.installation_date or '-' }}</td>
+                <td>{{ contract.start_date.strftime('%d/%m/%Y') if contract.start_date else '-' }}</td>
             </tr>
             {% else %}
             <tr><td colspan="5">Nenhum contrato encontrado.</td></tr>

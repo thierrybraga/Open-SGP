@@ -5,7 +5,7 @@ Fluxo:
 1. valida Docker/Compose e arquivo .env
 2. executa build das imagens
 3. sobe banco/Redis e executa Alembic
-4. sobe API, painel admin, worker e Zabbix
+4. sobe API, painel admin e worker
 5. valida endpoints de saúde e status dos containers
 """
 
@@ -160,7 +160,7 @@ def deploy(skip_build: bool = False) -> None:
 
     run(compose_cmd("up", "-d", "db", "redis"))
     run(compose_cmd("run", "--rm", "migrate"))
-    run(compose_cmd("up", "-d"))
+    run(compose_cmd("up", "-d", "--remove-orphans"))
 
     wait_for_url("http://127.0.0.1:8000/health/", attempts=45)
     wait_for_url("http://127.0.0.1:5000/login", attempts=45)
@@ -169,7 +169,8 @@ def deploy(skip_build: bool = False) -> None:
     print("\nDeploy concluído.")
     print("API: http://127.0.0.1:8000/docs")
     print("Painel admin: http://127.0.0.1:5000/login")
-    print("Zabbix: http://127.0.0.1:8081")
+    print("Zabbix: externo (configure a URL/API no setup do SGP)")
+    print("RADIUS: externo (configure a VM FreeRADIUS para usar as tabelas SQL do SGP)")
 
 
 def main() -> int:

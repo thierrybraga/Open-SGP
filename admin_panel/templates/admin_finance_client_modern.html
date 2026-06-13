@@ -49,10 +49,10 @@
             <span aria-hidden="true">📥</span>
             Exportar
           </button>
-          <button type="button" class="btn btn-primary" data-modal-target="modal-new-title">
+          <a href="/admin/finance/title" class="btn btn-primary">
             <span aria-hidden="true">➕</span>
             Novo Título
-          </button>
+          </a>
         </div>
       </header>
 
@@ -162,50 +162,23 @@
   <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 
   <script>
-    // Sample data (replace with actual data from backend)
-    const sampleData = [
+    const titleData = [
+      {% for item in items %}
       {
-        id: 1,
-        contract_id: 123,
-        document_number: '001/2024',
-        our_number: '123456',
-        due_date: '2024-12-20',
-        amount: 150.00,
-        status: 'open',
-        client_name: 'João Silva',
-        payment_date: null,
+        id: {{ item.id }},
+        contract_id: {{ item.contract_id }},
+        document_number: {{ item.document_number|tojson }},
+        our_number: {{ item.our_number|tojson }},
+        due_date: {{ item.due_date.isoformat()|tojson }},
+        amount: {{ item.amount|float }},
+        status: {{ item.status|tojson }},
+        client_name: {{ (item.contract.client.name if item.contract and item.contract.client else '')|tojson }},
+        payment_date: {{ (item.paid_date.isoformat() if item.paid_date else none)|tojson }},
         discount: 0,
-        interest: 0,
-        fine: 0
-      },
-      {
-        id: 2,
-        contract_id: 124,
-        document_number: '002/2024',
-        our_number: '123457',
-        due_date: '2024-12-15',
-        amount: 200.00,
-        status: 'paid',
-        client_name: 'Maria Santos',
-        payment_date: '2024-12-14',
-        discount: 10.00,
-        interest: 0,
-        fine: 0
-      },
-      {
-        id: 3,
-        contract_id: 125,
-        document_number: '003/2024',
-        our_number: '123458',
-        due_date: '2024-11-30',
-        amount: 180.00,
-        status: 'overdue',
-        client_name: 'Carlos Oliveira',
-        payment_date: null,
-        discount: 0,
-        interest: 5.40,
-        fine: 9.00
-      }
+        interest: {{ item.interest_percent|default(0)|float }},
+        fine: {{ item.fine_percent|default(0)|float }}
+      }{% if not loop.last %},{% endif %}
+      {% endfor %}
     ];
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -250,23 +223,18 @@
           }
         ],
         onApply: function(filters) {
-          console.log('Filters applied:', filters);
-          // TODO: Apply filters and reload data
-          ISP_AdvancedComponents.Toast.success('Filtros aplicados com sucesso');
-
-          // Simulate filtering
-          const filtered = sampleData.filter(item => {
-            if (filters.status && item.status !== filters.status) return false;
-            if (filters.client_id && item.contract_id != filters.client_id) return false;
-            return true;
-          });
-
-          dataTable.update(filtered);
+          const params = new URLSearchParams(window.location.search);
+          ['client_id', 'status', 'due_from', 'due_to', 'document_number', 'amount_min'].forEach(key => params.delete(key));
+          if (filters.client_id) params.set('client_id', filters.client_id);
+          if (filters.status) params.set('status', filters.status);
+          if (filters.due_date && filters.due_date.start) params.set('due_from', filters.due_date.start);
+          if (filters.due_date && filters.due_date.end) params.set('due_to', filters.due_date.end);
+          if (filters.document_number) params.set('document_number', filters.document_number);
+          if (filters.amount) params.set('amount_min', filters.amount);
+          window.location.search = params.toString();
         },
         onReset: function() {
-          console.log('Filters reset');
-          dataTable.update(sampleData);
-          ISP_AdvancedComponents.Toast.info('Filtros limpos');
+          window.location.href = '/admin/finance/client';
         }
       });
 
@@ -312,7 +280,7 @@
             }
           }
         ],
-        data: sampleData,
+        data: titleData,
         selectable: true,
         actions: [
           {
@@ -352,12 +320,10 @@
       // Initialize Pagination
       const pagination = new ISP_Components.Pagination({
         container: '#pagination-container',
-        total: sampleData.length,
+        total: titleData.length,
         currentPage: 1,
         pageSize: 10,
         onPageChange: function(page, pageSize) {
-          console.log('Page changed:', page, pageSize);
-          // TODO: Fetch new data from backend
           ISP_AdvancedComponents.Toast.info(`Carregando página ${page}...`);
         }
       });
@@ -492,47 +458,35 @@
 
       // Download boleto
       window.downloadBoleto = function(row) {
-        ISP_AdvancedComponents.Toast.info('Gerando boleto...', {
-          duration: 2000
-        });
-        setTimeout(() => {
-          ISP_AdvancedComponents.Toast.success('Boleto baixado com sucesso!');
-        }, 2000);
+        window.location.href = `/admin/finance/title?title_id=${row.id}`;
       };
 
       // Register payment
       window.registerPayment = function(row) {
-        ISP_ERP.confirm(
-          `Confirmar pagamento do título ${row.document_number}?`,
-          function(confirmed) {
-            if (confirmed) {
-              ISP_AdvancedComponents.Toast.success('Pagamento registrado com sucesso!');
-              row.status = 'paid';
-              row.payment_date = new Date().toISOString().split('T')[0];
-              dataTable.update(sampleData);
-            }
-          }
-        );
+        window.location.href = `/admin/finance/title?title_id=${row.id}`;
       };
 
       // Export data
       window.exportData = function() {
-        ISP_AdvancedComponents.Toast.info('Exportando dados...', {
-          duration: 2000
-        });
-        setTimeout(() => {
-          ISP_AdvancedComponents.Toast.success('Dados exportados para Excel!');
-        }, 2000);
+        const headers = ['id', 'contract_id', 'document_number', 'our_number', 'due_date', 'amount', 'status', 'client_name', 'payment_date'];
+        const csv = [
+          headers.join(','),
+          ...titleData.map(row => headers.map(key => JSON.stringify(row[key] ?? '')).join(','))
+        ].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'financeiro_cliente.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
       };
 
       // Refresh data
       window.refreshData = function() {
-        ISP_AdvancedComponents.Toast.info('Atualizando dados...', {
-          duration: 1500
-        });
-        setTimeout(() => {
-          ISP_AdvancedComponents.Toast.success('Dados atualizados!');
-        }, 1500);
+        window.location.reload();
       };
 
       // Print title

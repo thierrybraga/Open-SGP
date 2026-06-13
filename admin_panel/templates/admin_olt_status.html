@@ -222,18 +222,18 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
 
-      // Sample data (replace with actual data from backend)
       const onuData = [
         {% for it in items %}
         {
           contract_id: {{ it.contract_id }},
-          device_name: '{{ it.device_name }}',
-          vendor: '{{ it.vendor }}',
-          onu_id: '{{ it.onu_id }}',
+          device_name: {{ it.device_name|tojson }},
+          vendor: {{ it.vendor|tojson }},
+          onu_id: {{ it.onu_id|tojson }},
           online: {{ 'true' if it.online else 'false' }},
-          rx_power_dbm: {{ it.rx_power_dbm }},
-          tx_power_dbm: {{ it.tx_power_dbm }},
-          uptime_seconds: {{ it.uptime_seconds or 0 }}
+          rx_power_dbm: {{ it.rx_power_dbm|tojson }},
+          tx_power_dbm: {{ it.tx_power_dbm|tojson }},
+          uptime_seconds: {{ it.uptime_seconds or 0 }},
+          error: {{ it.error|tojson }}
         }{% if not loop.last %},{% endif %}
         {% endfor %}
       ];
@@ -242,7 +242,8 @@
       function updateStatistics() {
         const online = onuData.filter(o => o.online).length;
         const offline = onuData.filter(o => !o.online).length;
-        const avgRx = onuData.reduce((sum, o) => sum + o.rx_power_dbm, 0) / onuData.length || 0;
+        const rxValues = onuData.map(o => o.rx_power_dbm).filter(v => typeof v === 'number');
+        const avgRx = rxValues.reduce((sum, value) => sum + value, 0) / rxValues.length || 0;
 
         document.getElementById('stat-online').textContent = online;
         document.getElementById('stat-offline').textContent = offline;
@@ -333,6 +334,7 @@
             label: 'RX (dBm)',
             sortable: true,
             render: function(value) {
+              if (typeof value !== 'number') return '<span class="text-muted">-</span>';
               const quality = value >= -25 ? 'success' : value >= -27 ? 'warning' : 'danger';
               return `<span class="status-indicator ${quality}">${value.toFixed(2)}</span>`;
             }
@@ -342,6 +344,7 @@
             label: 'TX (dBm)',
             sortable: true,
             render: function(value) {
+              if (typeof value !== 'number') return '-';
               return value.toFixed(2);
             }
           },
@@ -352,6 +355,13 @@
             render: function(value) {
               const hours = Math.floor(value / 3600);
               return `${hours}h`;
+            }
+          },
+          {
+            field: 'error',
+            label: 'Integração',
+            render: function(value) {
+              return value ? `<span class="status-indicator warning" title="${value}">Erro</span>` : '<span class="status-indicator success">OK</span>';
             }
           }
         ],
@@ -406,11 +416,8 @@
             if (confirmed) {
               if (window.UI && window.UI.toast) UI.toast.info('Enviando comando de reinicialização...', { duration: 3000 });
               else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Enviando comando de reinicialização...', { duration: 3000 });
-              
-              setTimeout(() => {
-                if (window.UI && window.UI.toast) UI.toast.success('ONU reiniciada com sucesso!');
-                else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.success('ONU reiniciada com sucesso!');
-              }, 3000);
+              if (window.UI && window.UI.toast) UI.toast.warning('Comando de reinicialização ainda não possui endpoint operacional.');
+              else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.warning('Comando de reinicialização ainda não possui endpoint operacional.');
             }
           }
         );
@@ -428,13 +435,20 @@
 
       // Export data
       window.exportData = function() {
-        if (window.UI && window.UI.toast) UI.toast.info('Exportando dados...', { duration: 2000 });
-        else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.info('Exportando dados...', { duration: 2000 });
-        
-        setTimeout(() => {
-          if (window.UI && window.UI.toast) UI.toast.success('Dados exportados para Excel!');
-          else if (window.ISP_AdvancedComponents && window.ISP_AdvancedComponents.Toast) ISP_AdvancedComponents.Toast.success('Dados exportados para Excel!');
-        }, 2000);
+        const headers = ['contract_id', 'device_name', 'vendor', 'onu_id', 'online', 'rx_power_dbm', 'tx_power_dbm', 'uptime_seconds'];
+        const csv = [
+          headers.join(','),
+          ...onuData.map(row => headers.map(key => JSON.stringify(row[key] ?? '')).join(','))
+        ].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = 'status_onus.csv';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
       };
 
     });

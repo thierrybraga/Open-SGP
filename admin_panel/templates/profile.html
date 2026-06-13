@@ -49,24 +49,37 @@ Integrações:
                 👤
               </div>
               <div>
-                <h2 style="margin: 0;">{{ user }}</h2>
-                <span class="badge badge-primary">Administrador</span>
+                <h2 style="margin: 0;">{{ user.username if user.username is defined else user }}</h2>
+                {% for role in roles %}
+                <span class="badge badge-primary">{{ role }}</span>
+                {% else %}
+                <span class="badge badge-secondary">Sem perfil atribuído</span>
+                {% endfor %}
               </div>
             </div>
 
             <div class="profile-details">
               <dl style="display: grid; grid-template-columns: 150px 1fr; gap: 1rem;">
                 <dt style="font-weight: 600;">Usuário:</dt>
-                <dd>{{ user }}</dd>
+                <dd>{{ user.username if user.username is defined else user }}</dd>
+
+                <dt style="font-weight: 600;">Email:</dt>
+                <dd>{{ user.email if user.email is defined and user.email else '-' }}</dd>
 
                 <dt style="font-weight: 600;">Função:</dt>
-                <dd>Administrador do Sistema</dd>
+                <dd>{{ roles|join(', ') if roles else 'Sem perfil atribuído' }}</dd>
 
                 <dt style="font-weight: 600;">Status:</dt>
-                <dd><span class="status-indicator success"><span class="status-dot"></span>Ativo</span></dd>
+                <dd>
+                  {% if user.is_active is defined and not user.is_active %}
+                  <span class="status-indicator danger"><span class="status-dot"></span>Inativo</span>
+                  {% else %}
+                  <span class="status-indicator success"><span class="status-dot"></span>Ativo</span>
+                  {% endif %}
+                </dd>
 
-                <dt style="font-weight: 600;">Último Acesso:</dt>
-                <dd>Hoje</dd>
+                <dt style="font-weight: 600;">ID:</dt>
+                <dd>{{ user.id if user.id is defined else '-' }}</dd>
               </dl>
             </div>
             

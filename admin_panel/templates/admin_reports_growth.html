@@ -71,13 +71,27 @@ Integrações: admin_panel/app.py
 
       <div class="card">
         <div class="card-header">
-          <h2 class="card-title">Histórico Recente</h2>
+          <h2 class="card-title">Histórico dos Últimos 6 Meses</h2>
         </div>
         <div class="card-body">
-           <p class="text-muted">Gráfico de crescimento (simulado)</p>
-           <div style="height: 200px; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; border-radius: 8px;">
-              [ Gráfico de Barras: Entradas x Saídas ]
-           </div>
+          {% set max_value = data.max_monthly_value|default(1) %}
+          <div class="growth-chart" aria-label="Entradas e cancelamentos por mês">
+            {% for month in data.monthly %}
+            <div class="growth-month">
+              <div class="growth-bars">
+                <div class="growth-bar growth-bar-new" style="height: {{ (month.new / max_value * 100)|round(0, 'floor') }}%" title="Novos: {{ month.new }}"></div>
+                <div class="growth-bar growth-bar-canceled" style="height: {{ (month.canceled / max_value * 100)|round(0, 'floor') }}%" title="Cancelamentos: {{ month.canceled }}"></div>
+              </div>
+              <div class="growth-label">{{ month.label }}</div>
+              <div class="growth-net {{ 'positive' if month.net >= 0 else 'negative' }}">{{ "%+d"|format(month.net) }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="chart-legend" aria-label="Legenda do gráfico">
+            <span class="chart-legend-item"><span class="chart-legend-color growth-new"></span> Novos</span>
+            <span class="chart-legend-item"><span class="chart-legend-color growth-canceled"></span> Cancelamentos</span>
+            <span class="chart-legend-item">Saldo líquido por mês</span>
+          </div>
         </div>
       </div>
 
@@ -87,5 +101,46 @@ Integrações: admin_panel/app.py
   {% include 'components/footer.html' %}
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   <script src="{{ url_for('static', filename='js/navbar.js') }}"></script>
+  <style>
+    .growth-chart {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+      gap: 1rem;
+      min-height: 260px;
+      padding: 1rem;
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      background: var(--bg-secondary);
+    }
+    .growth-month {
+      display: grid;
+      grid-template-rows: 1fr auto auto;
+      gap: .5rem;
+      align-items: end;
+      min-width: 0;
+    }
+    .growth-bars {
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      gap: .35rem;
+      min-height: 180px;
+    }
+    .growth-bar {
+      width: 28px;
+      min-height: 4px;
+      border-radius: 4px 4px 0 0;
+    }
+    .growth-bar-new { background: var(--success-color); }
+    .growth-bar-canceled { background: var(--danger-color); }
+    .growth-label, .growth-net {
+      text-align: center;
+      font-size: .875rem;
+    }
+    .growth-net.positive { color: var(--success-color); }
+    .growth-net.negative { color: var(--danger-color); }
+    .growth-new { background: var(--success-color); }
+    .growth-canceled { background: var(--danger-color); }
+  </style>
 </body>
 </html>

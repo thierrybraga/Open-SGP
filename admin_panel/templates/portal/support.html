@@ -12,6 +12,7 @@
     <div id="newTicketForm" style="display: none; background: var(--bg-secondary); padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
         <h4>Novo Chamado</h4>
         <form action="/portal/support/create" method="POST">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
             <div class="form-group">
                 <label>Assunto</label>
                 <input type="text" name="subject" class="form-control" required>

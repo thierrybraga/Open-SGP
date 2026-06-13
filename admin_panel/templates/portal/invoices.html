@@ -30,7 +30,11 @@
                 </td>
                 <td>
                     {% if title.status != 'paid' %}
-                    <button class="btn btn-sm btn-primary" onclick="alert('Código de barras copiado!')">Copiar Código</button>
+                    {% if title.bar_code %}
+                    <button class="btn btn-sm btn-primary" data-barcode="{{ title.bar_code }}" onclick="copyBarcode(this)">Copiar Código</button>
+                    {% else %}
+                    <a class="btn btn-sm btn-primary" href="/portal/support">Solicitar Boleto</a>
+                    {% endif %}
                     {% else %}
                     <span class="text-muted">Pago</span>
                     {% endif %}
@@ -42,4 +46,32 @@
         </tbody>
     </table>
 </div>
+<script>
+function copyBarcode(button) {
+    const value = button.dataset.barcode || '';
+    if (!value) return;
+    const done = () => {
+        button.textContent = 'Copiado';
+        setTimeout(() => { button.textContent = 'Copiar Código'; }, 1800);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(value).then(done).catch(() => fallbackCopy(value, done));
+    } else {
+        fallbackCopy(value, done);
+    }
+}
+
+function fallbackCopy(value, done) {
+    const input = document.createElement('textarea');
+    input.value = value;
+    input.setAttribute('readonly', '');
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+    input.select();
+    document.execCommand('copy');
+    input.remove();
+    done();
+}
+</script>
 {% endblock %}

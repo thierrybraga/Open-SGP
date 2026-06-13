@@ -2,8 +2,8 @@
 Arquivo: app/modules/communication/service.py
 
 Responsabilidade:
-Regras de negócio para comunicação: gerenciar templates, enfileirar mensagens e
-despachar (stub), reprocessar falhas e atualizar status.
+Regras de negócio para comunicação: gerenciar templates, enfileirar mensagens,
+despachar via providers configurados, reprocessar falhas e atualizar status.
 
 Integrações:
 - modules.communication.models
@@ -69,7 +69,8 @@ def dispatch_message(db: Session, msg: MessageQueue) -> MessageQueue:
                 msg.provider = msg.provider or "whatsapp_api"
                 msg.provider_message_id = msg.provider_message_id or f"{msg.id}-{int(datetime.utcnow().timestamp())}"
         else:
-            sent_ok = True
+            sent_ok = False
+            msg.error = f"unsupported channel: {msg.channel}"
         msg.attempts = int(msg.attempts or 0) + 1
         msg.status = "sent" if sent_ok else "failed"
         msg.dispatched_at = datetime.utcnow()

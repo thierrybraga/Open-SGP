@@ -1,0 +1,296 @@
+{% extends 'base.html' %}
+
+{% block title %}Analytics - ISP ERP{% endblock %}
+
+{% block styles %}
+<style>
+  .analytics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  .analytics-kpi {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: .75rem;
+    padding: 1rem;
+    box-shadow: var(--shadow-sm);
+  }
+  .analytics-kpi-label {
+    color: var(--text-secondary);
+    font-size: .82rem;
+    margin-bottom: .35rem;
+  }
+  .analytics-kpi-value {
+    color: var(--text-primary);
+    font-size: 1.55rem;
+    font-weight: 700;
+  }
+  .analytics-section {
+    margin-bottom: 1.5rem;
+  }
+  .analytics-section-title {
+    margin: 0 0 .85rem 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+  }
+  .analytics-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 1rem;
+  }
+  .analytics-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-light);
+    border-radius: .75rem;
+    padding: 1rem;
+    box-shadow: var(--shadow-sm);
+    min-width: 0;
+  }
+  .analytics-card h3 {
+    margin: 0 0 .8rem 0;
+    font-size: .98rem;
+    font-weight: 600;
+  }
+  .analytics-card canvas {
+    height: 260px !important;
+    max-height: 280px;
+  }
+  .analytics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .9rem;
+  }
+  .analytics-table th,
+  .analytics-table td {
+    padding: .55rem;
+    border-bottom: 1px solid var(--border-light);
+    text-align: left;
+  }
+  .analytics-note {
+    color: var(--text-secondary);
+    font-size: .86rem;
+    line-height: 1.45;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container fade-in">
+  <header class="page-header d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h1 class="page-title">Analytics</h1>
+      <p class="page-subtitle text-muted">Indicadores gerenciais de financeiro, rede, operação, clientes, suporte, estoque, fiscal e comunicação.</p>
+    </div>
+    <button class="btn btn-outline-primary" onclick="window.location.reload()">Atualizar</button>
+  </header>
+
+  <div class="analytics-grid">
+    <div class="analytics-kpi">
+      <div class="analytics-kpi-label">MRR</div>
+      <div class="analytics-kpi-value">R$ {{ '%.2f'|format(data.financial.mrr) }}</div>
+    </div>
+    <div class="analytics-kpi">
+      <div class="analytics-kpi-label">ARR</div>
+      <div class="analytics-kpi-value">R$ {{ '%.2f'|format(data.financial.arr) }}</div>
+    </div>
+    <div class="analytics-kpi">
+      <div class="analytics-kpi-label">DSO Médio</div>
+      <div class="analytics-kpi-value">{{ '%.1f'|format(data.financial.dso) }} dias</div>
+    </div>
+    <div class="analytics-kpi">
+      <div class="analytics-kpi-label">Sessões RADIUS Ativas</div>
+      <div class="analytics-kpi-value">{{ data.network.radius_active }}</div>
+    </div>
+    <div class="analytics-kpi">
+      <div class="analytics-kpi-label">MTTR Técnico</div>
+      <div class="analytics-kpi-value">{{ '%.1f'|format(data.operations.mttr_hours) }} h</div>
+    </div>
+    <div class="analytics-kpi">
+      <div class="analytics-kpi-label">Itens Críticos</div>
+      <div class="analytics-kpi-value">{{ data.stock.critical_items }}</div>
+    </div>
+  </div>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Financeiro</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>Faturamento Mensal Recebido</h3><canvas id="monthlyRevenueChart"></canvas></div>
+      <div class="analytics-card"><h3>Inadimplência por Aging</h3><canvas id="agingChart"></canvas></div>
+      <div class="analytics-card"><h3>Recebimento por Método</h3><canvas id="paymentMethodChart"></canvas></div>
+      <div class="analytics-card">
+        <h3>CNAB e Gateway</h3>
+        <table class="analytics-table">
+          <tr><th>Remessas</th><td>{{ data.financial.cnab.remittances }}</td></tr>
+          <tr><th>Retornos</th><td>{{ data.financial.cnab.returns }}</td></tr>
+          <tr><th>Retornos pendentes</th><td>{{ data.financial.cnab.returns_pending }}</td></tr>
+          <tr><th>Churn financeiro mensal</th><td>R$ {{ '%.2f'|format(data.financial.financial_churn) }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Rede</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>Uso de Pools IP</h3><canvas id="poolUsageChart"></canvas></div>
+      <div class="analytics-card"><h3>Tráfego RADIUS por NAS (GB)</h3><canvas id="trafficNasChart"></canvas></div>
+      <div class="analytics-card">
+        <h3>Provisionamento e Zabbix</h3>
+        <table class="analytics-table">
+          <tr><th>Atribuições ativas</th><td>{{ data.network.assignments_active }} / {{ data.network.assignments_total }}</td></tr>
+          <tr><th>Contratos bloqueados na rede</th><td>{{ data.network.assignments_blocked }}</td></tr>
+          <tr><th>OLTs cadastradas</th><td>{{ data.network.olt_total }}</td></tr>
+          <tr><th>Zabbix monitorados/sincronizados</th><td>{{ data.network.zabbix_monitored }} / {{ data.network.zabbix_synced }}</td></tr>
+        </table>
+        <p class="analytics-note">Potência RX/TX por OLT/PON e disponibilidade real dependem da coleta de OLT/Zabbix em produção.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Operação Técnica</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>OS por Status</h3><canvas id="serviceStatusChart"></canvas></div>
+      <div class="analytics-card"><h3>Backlog Aging</h3><canvas id="backlogChart"></canvas></div>
+      <div class="analytics-card"><h3>OS por Técnico</h3><canvas id="techChart"></canvas></div>
+      <div class="analytics-card">
+        <h3>Reincidência</h3>
+        <div class="analytics-kpi-value">{{ data.operations.recurrence_clients }}</div>
+        <p class="analytics-note">Clientes com mais de uma OS registrada.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Clientes e Contratos</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>Ativações x Cancelamentos</h3><canvas id="growthChart"></canvas></div>
+      <div class="analytics-card"><h3>Net Adds</h3><canvas id="netAddsChart"></canvas></div>
+      <div class="analytics-card"><h3>Mix de Planos</h3><canvas id="planMixChart"></canvas></div>
+      <div class="analytics-card"><h3>Status dos Contratos</h3><canvas id="contractStatusChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Suporte</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>Tickets por Categoria</h3><canvas id="ticketCategoryChart"></canvas></div>
+      <div class="analytics-card"><h3>Tickets por Origem</h3><canvas id="ticketOriginChart"></canvas></div>
+      <div class="analytics-card">
+        <h3>SLA e Resposta</h3>
+        <table class="analytics-table">
+          <tr><th>Tickets abertos</th><td>{{ data.support.tickets_open }}</td></tr>
+          <tr><th>SLA vencido</th><td>{{ data.support.sla_overdue }}</td></tr>
+          <tr><th>1ª resposta média</th><td>{{ '%.1f'|format(data.support.first_response_hours) }} h</td></tr>
+          <tr><th>Reabertura</th><td>{{ '%.1f'|format(data.support.reopen_rate) }}%</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Estoque</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>Saldo por Depósito</h3><canvas id="warehouseBalanceChart"></canvas></div>
+      <div class="analytics-card"><h3>Movimentações por Tipo</h3><canvas id="stockMovementChart"></canvas></div>
+      <div class="analytics-card"><h3>Comodato por Status</h3><canvas id="comodatoChart"></canvas></div>
+      <div class="analytics-card"><h3>Comodato por Cliente</h3><canvas id="comodatoClientChart"></canvas></div>
+    </div>
+  </section>
+
+  <section class="analytics-section">
+    <h2 class="analytics-section-title">Fiscal e Comunicação</h2>
+    <div class="analytics-chart-grid">
+      <div class="analytics-card"><h3>Notas por Status</h3><canvas id="invoiceStatusChart"></canvas></div>
+      <div class="analytics-card"><h3>Total Fiscal por Tipo</h3><canvas id="invoiceTypeChart"></canvas></div>
+      <div class="analytics-card"><h3>Comunicação por Canal</h3><canvas id="commChannelChart"></canvas></div>
+      <div class="analytics-card"><h3>Falhas por Provider</h3><canvas id="commFailureChart"></canvas></div>
+      <div class="analytics-card">
+        <h3>Pendências de Homologação Fiscal</h3>
+        <table class="analytics-table">
+          <tr><th>Notas em rascunho</th><td>{{ data.fiscal.pending.draft_invoices }}</td></tr>
+          <tr><th>Planos sem detalhe fiscal</th><td>{{ data.fiscal.pending.plans_without_fiscal_detail }}</td></tr>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const analyticsData = {{ data|tojson }};
+const colors = ['#3498db', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6', '#1abc9c', '#34495e', '#e67e22'];
+
+function labels(series) { return (series || []).map(item => item.label); }
+function values(series, key = 'value') { return (series || []).map(item => Number(item[key] || 0)); }
+
+function chart(id, type, series, label, key = 'value') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  new Chart(el.getContext('2d'), {
+    type,
+    data: {
+      labels: labels(series),
+      datasets: [{
+        label,
+        data: values(series, key),
+        backgroundColor: type === 'line' ? 'rgba(52,152,219,.12)' : colors,
+        borderColor: '#3498db',
+        tension: .35,
+        fill: type === 'line'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: type === 'doughnut' } },
+      scales: type === 'doughnut' ? {} : { y: { beginAtZero: true } }
+    }
+  });
+}
+
+function twoSeriesChart(id, labelsData, first, second, firstLabel, secondLabel) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  new Chart(el.getContext('2d'), {
+    type: 'bar',
+    data: {
+      labels: labels(labelsData),
+      datasets: [
+        { label: firstLabel, data: values(first), backgroundColor: '#2ecc71' },
+        { label: secondLabel, data: values(second), backgroundColor: '#e74c3c' }
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  chart('monthlyRevenueChart', 'line', analyticsData.financial.monthly_revenue, 'Recebido');
+  chart('agingChart', 'bar', analyticsData.financial.aging, 'Valor');
+  chart('paymentMethodChart', 'doughnut', analyticsData.financial.payments_by_method, 'Valor');
+  chart('poolUsageChart', 'bar', analyticsData.network.pool_usage, 'Uso %', 'percent');
+  chart('trafficNasChart', 'bar', analyticsData.network.traffic_by_nas, 'GB');
+  chart('serviceStatusChart', 'doughnut', analyticsData.operations.service_orders_by_status, 'OS');
+  chart('backlogChart', 'bar', analyticsData.operations.backlog_aging, 'OS');
+  chart('techChart', 'bar', analyticsData.operations.service_orders_by_tech, 'OS');
+  twoSeriesChart('growthChart', analyticsData.clients.activations, analyticsData.clients.activations, analyticsData.clients.cancellations, 'Ativações', 'Cancelamentos');
+  chart('netAddsChart', 'line', analyticsData.clients.net_adds, 'Net adds');
+  chart('planMixChart', 'doughnut', analyticsData.clients.plan_mix, 'Contratos');
+  chart('contractStatusChart', 'doughnut', analyticsData.clients.contract_status, 'Contratos');
+  chart('ticketCategoryChart', 'bar', analyticsData.support.tickets_by_category, 'Tickets');
+  chart('ticketOriginChart', 'doughnut', analyticsData.support.by_origin, 'Tickets');
+  chart('warehouseBalanceChart', 'bar', analyticsData.stock.warehouse_balance, 'Saldo');
+  chart('stockMovementChart', 'doughnut', analyticsData.stock.stock_movements, 'Movimentos');
+  chart('comodatoChart', 'doughnut', analyticsData.stock.comodato_status, 'Comodatos');
+  chart('comodatoClientChart', 'bar', analyticsData.stock.comodato_top_clients, 'Comodatos');
+  chart('invoiceStatusChart', 'doughnut', analyticsData.fiscal.invoice_status, 'Notas');
+  chart('invoiceTypeChart', 'bar', analyticsData.fiscal.invoice_type_totals, 'Total');
+  chart('commChannelChart', 'doughnut', analyticsData.communication.by_channel, 'Mensagens');
+  chart('commFailureChart', 'bar', analyticsData.communication.failures_by_provider, 'Falhas');
+});
+</script>
+{% endblock %}

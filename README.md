@@ -96,6 +96,14 @@ docker-compose up -d --build
 
 A API estará disponível em: `http://localhost:8000/docs`
 
+### Arquitetura de Produção
+
+Para melhor performance e estabilidade operacional, o Docker do Open-SGP deve executar apenas os serviços do SGP: API, painel administrativo, worker, PostgreSQL e Redis.
+
+- **Zabbix**: rode em uma VM dedicada. Configure a URL da API, usuário, senha, templates e grupos no setup de monitoramento do SGP.
+- **FreeRADIUS**: rode em uma VM dedicada. A VM deve acessar as tabelas SQL do SGP (`radcheck`, `radreply`, `radusergroup`, `radacct`, `nas`) no PostgreSQL do SGP ou em uma réplica dedicada.
+- **Docker Compose**: não sobe mais `zabbix-server`, `zabbix-web` nem container RADIUS.
+
 ### Execução Local
 
 1.  **Crie um ambiente virtual:**

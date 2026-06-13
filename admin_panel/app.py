@@ -13,12 +13,14 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import create_engine, func, case
 import secrets
 import os
+import csv
+import io
 
 from app.core.config import settings
 from app.core.database import import_all_models, SessionLocal, Base, engine
 from app.modules.communication.models import MessageQueue
 from app.modules.communication.service import requeue_failed, dispatch_message
-from app.modules.reports.service import dashboard_overview, timeseries_communication_success, timeseries_service_orders_status
+from app.modules.reports.service import analytics_overview, dashboard_overview, timeseries_communication_success, timeseries_service_orders_status
 from app.modules.service_orders.models import ServiceOrder
 from app.modules.network.models import ContractNetworkAssignment, ContractTechHistory
 from app.modules.network.service import (
@@ -199,8 +201,15 @@ def create_app() -> Flask:
         if not session.get("authenticated"):
             flash("Por favor, faça login para acessar esta página", "warning")
             return redirect(url_for("login"))
-        # TODO: Implement profile page
-        return render_template("profile.html", user=session.get("user"))
+        user = None
+        user_id = session.get("user_id")
+        db = SessionLocal()
+        try:
+            if user_id:
+                user = db.query(User).options(joinedload(User.roles)).filter(User.id == user_id).first()
+        finally:
+            db.close()
+        return render_template("profile.html", user=user or session.get("user"), roles=session.get("roles", []))
 
     @app.route("/settings")
     def user_settings():
@@ -249,27 +258,118 @@ def create_app() -> Flask:
         db.close()
         return render_template("admin_communication_queue.html", items=items, status_=status_, channel=channel, contract_id=contract_id, client_id=client_id, provider=provider)
 
-    @app.route("/communication/queue/requeue/<int:message_id>")
+    @app.route("/communication/queue/export")
+    def communication_queue_export():
+        db = SessionLocal()
+        try:
+            q = db.query(MessageQueue)
+            status_ = request.args.get("status")
+            channel = request.args.get("channel")
+            if status_:
+                q = q.filter(MessageQueue.status == status_)
+            if channel:
+                q = q.filter(MessageQueue.channel == channel)
+            rows = q.order_by(MessageQueue.created_at.desc()).limit(5000).all()
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["id", "channel", "destination", "status", "attempts", "provider", "scheduled_at", "dispatched_at", "error", "created_at"])
+            for msg in rows:
+                writer.writerow([
+                    msg.id,
+                    msg.channel,
+                    msg.destination,
+                    msg.status,
+                    msg.attempts,
+                    msg.provider or "",
+                    msg.scheduled_at or "",
+                    msg.dispatched_at or "",
+                    msg.error or "",
+                    msg.created_at or "",
+                ])
+            resp = make_response(buf.getvalue())
+            resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+            resp.headers["Content-Disposition"] = "attachment; filename=\"fila_comunicacao.csv\""
+            return resp
+        finally:
+            db.close()
+
+    @app.route("/communication/queue/requeue/<int:message_id>", methods=["GET", "POST"])
     def communication_requeue(message_id: int):
         db = SessionLocal()
         try:
             requeue_failed(db, message_id)
         finally:
             db.close()
+        if request.method == "POST":
+            return {"success": True}
+        return redirect(url_for("communication_queue"))
 
 
 
 
-    @app.route("/communication/queue/dispatch/<int:message_id>")
+    @app.route("/communication/queue/dispatch/<int:message_id>", methods=["GET", "POST"])
+    @app.route("/communication/queue/<int:message_id>/dispatch", methods=["POST"])
     def communication_dispatch_now(message_id: int):
         db = SessionLocal()
         try:
             msg = db.query(MessageQueue).filter(MessageQueue.id == message_id).first()
             if msg:
                 dispatch_message(db, msg)
+            elif request.method == "POST":
+                return {"success": False, "error": "Mensagem não encontrada"}
         finally:
             db.close()
+        if request.method == "POST":
+            return {"success": True}
         return redirect(url_for("communication_queue"))
+
+    @app.route("/communication/queue/<int:message_id>/delete", methods=["POST"])
+    def communication_delete(message_id: int):
+        db = SessionLocal()
+        try:
+            msg = db.query(MessageQueue).filter(MessageQueue.id == message_id).first()
+            if not msg:
+                return {"success": False, "error": "Mensagem não encontrada"}
+            db.delete(msg)
+            db.commit()
+            return {"success": True}
+        except Exception as e:
+            db.rollback()
+            return {"success": False, "error": str(e)}
+        finally:
+            db.close()
+
+    @app.route("/communication/queue/bulk", methods=["POST"])
+    def communication_queue_bulk():
+        data = request.get_json(silent=True) or {}
+        action = data.get("action")
+        ids = [int(i) for i in data.get("ids", []) if str(i).isdigit()]
+        if action not in {"dispatch", "requeue", "delete"}:
+            return {"success": False, "error": "Ação inválida"}
+        if not ids:
+            return {"success": False, "error": "Nenhuma mensagem selecionada"}
+        db = SessionLocal()
+        processed = 0
+        try:
+            for message_id in ids:
+                msg = db.query(MessageQueue).filter(MessageQueue.id == message_id).first()
+                if not msg:
+                    continue
+                if action == "dispatch":
+                    dispatch_message(db, msg)
+                elif action == "requeue":
+                    requeue_failed(db, message_id)
+                elif action == "delete":
+                    db.delete(msg)
+                    processed += 1
+            if action == "delete":
+                db.commit()
+            return {"success": True, "processed": processed or len(ids)}
+        except Exception as e:
+            db.rollback()
+            return {"success": False, "error": str(e)}
+        finally:
+            db.close()
 
     @app.route("/communication/history")
     def communication_history():
@@ -985,10 +1085,12 @@ def create_app() -> Flask:
             status_ = (request.args.get("status") or "").strip()
             due_from_raw = request.args.get("due_from") or ""
             due_to_raw = request.args.get("due_to") or ""
+            document_number = (request.args.get("document_number") or "").strip()
+            amount_min_raw = (request.args.get("amount_min") or "").strip()
             df = date.fromisoformat(due_from_raw) if due_from_raw else None
             dt = date.fromisoformat(due_to_raw) if due_to_raw else None
 
-            q = db.query(Title)
+            q = db.query(Title).options(joinedload(Title.contract).joinedload(Contract.client))
             if client_id_raw:
                 try:
                     cid = int(client_id_raw)
@@ -998,6 +1100,13 @@ def create_app() -> Flask:
                     pass
             if status_:
                 q = q.filter(Title.status == status_)
+            if document_number:
+                q = q.filter(Title.document_number.ilike(f"%{document_number}%"))
+            if amount_min_raw:
+                try:
+                    q = q.filter(Title.amount >= float(amount_min_raw.replace(",", ".")))
+                except ValueError:
+                    pass
             if df:
                 q = q.filter(Title.due_date >= df)
             if dt:
@@ -1008,7 +1117,17 @@ def create_app() -> Flask:
                     totals[t.status] += float(t.amount)
         finally:
             db.close()
-        return render_template("admin_finance_client_modern.html", items=items, totals=totals, client_id=client_id_raw, status_=status_, due_from=due_from_raw, due_to=due_to_raw)
+        return render_template(
+            "admin_finance_client_modern.html",
+            items=items,
+            totals=totals,
+            client_id=client_id_raw,
+            status_=status_,
+            due_from=due_from_raw,
+            due_to=due_to_raw,
+            document_number=document_number,
+            amount_min=amount_min_raw,
+        )
 
     @app.route("/admin/finance/title", methods=["GET", "POST"]) 
     def admin_finance_title():
@@ -1378,9 +1497,20 @@ def create_app() -> Flask:
                         "rx_power_dbm": status.get("rx_power_dbm"),
                         "tx_power_dbm": status.get("tx_power_dbm"),
                         "uptime_seconds": status.get("uptime_seconds"),
+                        "error": None,
                     })
-                except Exception:
-                    continue
+                except Exception as exc:
+                    items.append({
+                        "contract_id": a.contract_id,
+                        "device_name": a.device.name if a.device else "-",
+                        "vendor": a.device.vendor if a.device else "-",
+                        "onu_id": str(a.contract_id),
+                        "online": False,
+                        "rx_power_dbm": None,
+                        "tx_power_dbm": None,
+                        "uptime_seconds": 0,
+                        "error": str(exc),
+                    })
             devices = db.query(NetworkDevice).filter(NetworkDevice.vendor.in_(["huawei", "zte", "vsol"])) .order_by(NetworkDevice.name.asc()).all()
         finally:
             db.close()
@@ -2830,35 +2960,6 @@ def create_app() -> Flask:
     # ==========================================
 
 
-    @app.route("/communication/queue/<int:msg_id>/dispatch", methods=["POST"])
-    def communication_dispatch(msg_id: int):
-        db = SessionLocal()
-        try:
-            msg = db.query(MessageQueue).filter(MessageQueue.id == msg_id).first()
-            if msg:
-                dispatch_message(db, msg)
-                return {"success": True}
-            return {"success": False, "error": "Mensagem não encontrada"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-        finally:
-            db.close()
-
-    @app.route("/communication/queue/<int:msg_id>/delete", methods=["POST"])
-    def communication_delete(msg_id: int):
-        db = SessionLocal()
-        try:
-            msg = db.query(MessageQueue).filter(MessageQueue.id == msg_id).first()
-            if msg:
-                db.delete(msg)
-                db.commit()
-                return {"success": True}
-            return {"success": False, "error": "Mensagem não encontrada"}
-        except Exception as e:
-            return {"success": False, "error": str(e)}
-        finally:
-            db.close()
-
 
 
 
@@ -2922,6 +3023,54 @@ def create_app() -> Flask:
         try:
             titles = list_titles(db, session["client_id"])
             return render_template("portal/invoices.html", titles=titles)
+        finally:
+            db.close()
+
+    @app.route("/portal/trust-unlock", methods=["POST"])
+    def portal_trust_unlock():
+        if "client_id" not in session:
+            return redirect("/portal/login")
+
+        from datetime import date
+        db = SessionLocal()
+        try:
+            client_id = int(session["client_id"])
+            overdue_count = (
+                db.query(Title)
+                .join(Contract, Title.contract_id == Contract.id)
+                .filter(Contract.client_id == client_id)
+                .filter(Title.status.in_(["overdue", "open"]))
+                .filter(Title.due_date < date.today())
+                .count()
+            )
+            if overdue_count:
+                flash("Desbloqueio indisponível: regularize as faturas vencidas ou abra um chamado.", "warning")
+                return redirect("/portal/invoices")
+
+            suspended_contracts = (
+                db.query(Contract)
+                .filter(Contract.client_id == client_id, Contract.status == "suspended")
+                .order_by(Contract.updated_at.desc())
+                .all()
+            )
+            if not suspended_contracts:
+                flash("Nenhum contrato suspenso elegível para desbloqueio.", "info")
+                return redirect("/portal/dashboard")
+
+            unlocked = 0
+            errors = []
+            for contract in suspended_contracts:
+                try:
+                    unblock_contract(db, contract.id)
+                    unlocked += 1
+                except Exception as exc:
+                    errors.append(f"Contrato {contract.id}: {exc}")
+
+            if unlocked:
+                flash(f"Desbloqueio solicitado com sucesso para {unlocked} contrato(s).", "success")
+            if errors:
+                flash("Alguns contratos dependem de integração externa: " + " | ".join(errors[:3]), "warning")
+            return redirect("/portal/dashboard")
         finally:
             db.close()
             
@@ -3100,11 +3249,21 @@ def create_app() -> Flask:
         db = SessionLocal()
         try:
             if request.method == "POST":
-                wh_id = request.form.get("id")
-                name = request.form.get("name")
-                code = request.form.get("code")
-                address = request.form.get("address")
-                is_active = request.form.get("is_active") == "on"
+                payload = request.get_json(silent=True) if request.is_json else None
+                form = payload or request.form
+                wants_json = request.is_json or request.headers.get("Accept") == "application/json"
+                wh_id = form.get("id")
+                name = (form.get("name") or "").strip()
+                code = (form.get("code") or "").strip()
+                address = (form.get("address") or "").strip() or None
+                is_active_raw = form.get("is_active")
+                is_active = bool(is_active_raw) if isinstance(is_active_raw, bool) else is_active_raw in {"on", "true", "1", "yes", None}
+
+                if not name or not code:
+                    if wants_json:
+                        return {"success": False, "error": "Nome e código são obrigatórios"}
+                    flash("Nome e código são obrigatórios", "error")
+                    return redirect(url_for("admin_stock_warehouses"))
 
                 if wh_id:
                     wh = db.query(Warehouse).filter(Warehouse.id == wh_id).first()
@@ -3115,6 +3274,8 @@ def create_app() -> Flask:
                         wh.is_active = is_active
                         db.commit()
                         flash("Almoxarifado atualizado com sucesso!", "success")
+                    elif wants_json:
+                        return {"success": False, "error": "Almoxarifado não encontrado"}
                 else:
                     new_wh = Warehouse(
                         name=name,
@@ -3126,6 +3287,8 @@ def create_app() -> Flask:
                     db.commit()
                     flash("Almoxarifado criado com sucesso!", "success")
                 
+                if wants_json:
+                    return {"success": True}
                 return redirect(url_for("admin_stock_warehouses"))
 
             warehouses = db.query(Warehouse).all()
@@ -3187,12 +3350,7 @@ def create_app() -> Flask:
 
     @app.route("/admin/communication/queue")
     def admin_communication_queue():
-        db = SessionLocal()
-        try:
-            items = db.query(MessageQueue).filter(MessageQueue.status == "queued").order_by(MessageQueue.created_at.desc()).all()
-            return render_template("admin_communication_queue.html", items=items)
-        finally:
-            db.close()
+        return redirect(url_for("communication_queue", **request.args))
 
     @app.route("/admin/communication/queue/requeue", methods=["POST"])
     def admin_communication_requeue():
@@ -3341,14 +3499,25 @@ def create_app() -> Flask:
             # NAS Count (Routers/Concentrators)
             nas_count = db.query(func.count(NetworkDevice.id)).filter(NetworkDevice.type.in_(['router', 'bras'])).scalar() or 0
             
-            # OLTs Online (Assuming type='olt')
-            olts_online = db.query(func.count(NetworkDevice.id)).filter(NetworkDevice.type == 'olt').scalar() or 0
+            olts_online = db.query(func.count(NetworkDevice.id)).filter(
+                NetworkDevice.type == 'olt',
+                NetworkDevice.enabled == True,
+            ).scalar() or 0
             
             # SICI Accesses (Total active contracts)
             sici_accesses = contracts_active
             
             # SICI Avg Speed (Avg download speed of active contracts)
             sici_avg_speed = db.query(func.avg(Plan.download_speed_mbps)).join(Contract, Contract.plan_id == Plan.id).filter(Contract.status == 'active').scalar() or 0.0
+
+            sici_pf = db.query(func.count(Contract.id)).join(Client, Contract.client_id == Client.id).filter(
+                Contract.status == "active",
+                Client.person_type == "PF",
+            ).scalar() or 0
+            sici_pj = db.query(func.count(Contract.id)).join(Client, Contract.client_id == Client.id).filter(
+                Contract.status == "active",
+                Client.person_type == "PJ",
+            ).scalar() or 0
             
             data = {
                 "contracts_active": contracts_active,
@@ -3356,10 +3525,50 @@ def create_app() -> Flask:
                 "nas_count": nas_count,
                 "olts_online": olts_online,
                 "sici_accesses": sici_accesses,
-                "sici_avg_speed": round(sici_avg_speed, 2)
+                "sici_avg_speed": round(sici_avg_speed, 2),
+                "sici_pf": sici_pf,
+                "sici_pj": sici_pj,
             }
             
             return render_template("admin_reports_network.html", data=data)
+        finally:
+            db.close()
+
+    @app.route("/admin/reports/network/sici.csv")
+    def admin_reports_network_sici_export():
+        db = SessionLocal()
+        try:
+            from sqlalchemy import func
+            rows = (
+                db.query(
+                    Client.person_type,
+                    Plan.name,
+                    func.count(Contract.id).label("accesses"),
+                    func.avg(Plan.download_speed_mbps).label("avg_download"),
+                    func.avg(Plan.upload_speed_mbps).label("avg_upload"),
+                )
+                .join(Client, Contract.client_id == Client.id)
+                .join(Plan, Contract.plan_id == Plan.id)
+                .filter(Contract.status == "active")
+                .group_by(Client.person_type, Plan.name)
+                .order_by(Client.person_type, Plan.name)
+                .all()
+            )
+            buf = io.StringIO()
+            writer = csv.writer(buf)
+            writer.writerow(["person_type", "plan", "active_accesses", "avg_download_mbps", "avg_upload_mbps"])
+            for person_type, plan_name, accesses, avg_download, avg_upload in rows:
+                writer.writerow([
+                    person_type,
+                    plan_name,
+                    accesses,
+                    round(avg_download or 0, 2),
+                    round(avg_upload or 0, 2),
+                ])
+            resp = make_response(buf.getvalue())
+            resp.headers["Content-Type"] = "text/csv; charset=utf-8"
+            resp.headers["Content-Disposition"] = "attachment; filename=\"sici_acessos.csv\""
+            return resp
         finally:
             db.close()
 
@@ -3387,53 +3596,55 @@ def create_app() -> Flask:
             
             # Churn Rate
             churn_rate = (canceled_contracts_30d / total_clients) * 100 if total_clients > 0 else 0.0
+
+            monthly = []
+            for offset in range(5, -1, -1):
+                month_index = today.month - offset
+                year = today.year + ((month_index - 1) // 12)
+                month = ((month_index - 1) % 12) + 1
+                month_anchor = today.replace(year=year, month=month, day=1)
+                next_month = (month_anchor.replace(day=28) + timedelta(days=4)).replace(day=1)
+                new_count = db.query(func.count(Contract.id)).filter(
+                    Contract.created_at >= month_anchor,
+                    Contract.created_at < next_month,
+                ).scalar() or 0
+                canceled_count = db.query(func.count(Contract.id)).filter(
+                    Contract.status == "canceled",
+                    Contract.updated_at >= month_anchor,
+                    Contract.updated_at < next_month,
+                ).scalar() or 0
+                monthly.append({
+                    "label": month_anchor.strftime("%m/%Y"),
+                    "new": new_count,
+                    "canceled": canceled_count,
+                    "net": new_count - canceled_count,
+                })
             
             data = {
                 "new_contracts_30d": new_contracts_30d,
                 "canceled_contracts_30d": canceled_contracts_30d,
                 "churn_rate": churn_rate,
-                "total_clients": total_clients
+                "total_clients": total_clients,
+                "monthly": monthly,
+                "max_monthly_value": max([1] + [m["new"] for m in monthly] + [m["canceled"] for m in monthly]),
             }
             
             return render_template("admin_reports_growth.html", data=data)
         finally:
             db.close()
 
-    @app.route("/admin/network/olt_status")
-    def admin_olt_status():
+    @app.route("/admin/reports/analytics")
+    def admin_reports_analytics():
         db = SessionLocal()
         try:
-            # Get OLT devices for filter
-            devices = db.query(NetworkDevice).filter(NetworkDevice.type == 'olt').all()
-            
-            # Get Items (Simulated for now based on Assignments)
-            assignments = db.query(
-                ContractNetworkAssignment, 
-                NetworkDevice.name.label('device_name'), 
-                NetworkDevice.vendor
-            ).join(NetworkDevice, ContractNetworkAssignment.device_id == NetworkDevice.id)\
-             .filter(NetworkDevice.type == 'olt').limit(100).all()
-            
-            import random
-            
-            items = []
-            for assign, dev_name, dev_vendor in assignments:
-                # Simulate live data
-                is_online = random.choice([True, True, True, False])
-                items.append({
-                    "contract_id": assign.contract_id,
-                    "device_name": dev_name,
-                    "vendor": dev_vendor,
-                    "onu_id": f"ONU-{assign.id}", 
-                    "online": is_online,
-                    "rx_power_dbm": round(random.uniform(-25.0, -15.0), 2) if is_online else 0.0,
-                    "tx_power_dbm": round(random.uniform(2.0, 5.0), 2) if is_online else 0.0,
-                    "uptime_seconds": random.randint(3600, 864000) if is_online else 0
-                })
-            
-            return render_template("admin_olt_status.html", items=items, devices=devices)
+            data = analytics_overview(db, months=6)
+            return render_template("admin_reports_analytics.html", data=data)
         finally:
             db.close()
+
+    @app.route("/admin/network/olt_status")
+    def admin_olt_status():
+        return redirect(url_for("admin_network_olt_status", **request.args))
 
     @app.route("/tech/login", methods=["GET", "POST"])
     def tech_login():

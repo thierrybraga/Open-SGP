@@ -249,6 +249,12 @@ Integrações:
       document.getElementById('stat-failed').textContent = queueData.filter(i => i.status === 'failed').length;
       document.getElementById('stat-total').textContent = queueData.length;
 
+      const csrfToken = {{ csrf_token | tojson }};
+      const jsonHeaders = {
+        'Content-Type': 'application/json',
+        'X-CSRF-Token': csrfToken
+      };
+
       const dataTable = new ISP_Components.DataTable({
         container: '#table-container',
         columns: [
@@ -288,17 +294,21 @@ Integrações:
           }
         ],
         data: queueData,
+        selectable: true,
         pagination: true,
         itemsPerPage: 10
       });
       
       window.refreshQueue = () => window.location.reload();
-      window.exportQueue = () => alert('Exportação simulada: queue.csv');
+      window.exportQueue = () => {
+        const params = new URLSearchParams(window.location.search);
+        window.location.href = `/communication/queue/export?${params.toString()}`;
+      };
       window.openBulkActionsModal = () => ISP_ERP.openModal('modal-bulk-actions');
       
       window.dispatchMessage = (id) => {
         if(!confirm('Enviar mensagem agora?')) return;
-        fetch(`/communication/queue/${id}/dispatch`, { method: 'POST' })
+        fetch(`/communication/queue/${id}/dispatch`, { method: 'POST', headers: {'X-CSRF-Token': csrfToken} })
           .then(r => r.json())
           .then(d => {
             if(d.success) window.location.reload();
@@ -308,7 +318,7 @@ Integrações:
 
       window.deleteMessage = (id) => {
         if(!confirm('Excluir mensagem da fila?')) return;
-        fetch(`/communication/queue/${id}/delete`, { method: 'POST' })
+        fetch(`/communication/queue/${id}/delete`, { method: 'POST', headers: {'X-CSRF-Token': csrfToken} })
           .then(r => r.json())
           .then(d => {
             if(d.success) window.location.reload();
@@ -348,10 +358,33 @@ Integrações:
         ISP_ERP.openModal('modal-message-details');
       };
 
-      // Bulk actions (stubs)
-      window.bulkDispatch = () => alert('Funcionalidade em desenvolvimento');
-      window.bulkRequeue = () => alert('Funcionalidade em desenvolvimento');
-      window.bulkDelete = () => alert('Funcionalidade em desenvolvimento');
+      function selectedMessageIds() {
+        return dataTable.getSelectedRows ? dataTable.getSelectedRows() : [];
+      }
+
+      function runBulkAction(action, confirmText) {
+        const ids = selectedMessageIds();
+        if (!ids.length) {
+          alert('Selecione ao menos uma mensagem.');
+          return;
+        }
+        if (!confirm(confirmText.replace('{count}', ids.length))) return;
+        fetch('/communication/queue/bulk', {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: JSON.stringify({ action, ids })
+        })
+          .then(r => r.json())
+          .then(d => {
+            if(d.success) window.location.reload();
+            else alert('Erro: ' + d.error);
+          })
+          .catch(err => alert('Erro: ' + err));
+      }
+
+      window.bulkDispatch = () => runBulkAction('dispatch', 'Despachar {count} mensagem(ns) selecionada(s)?');
+      window.bulkRequeue = () => runBulkAction('requeue', 'Reenfileirar {count} mensagem(ns) selecionada(s)?');
+      window.bulkDelete = () => runBulkAction('delete', 'Excluir {count} mensagem(ns) selecionada(s)?');
     });
   </script>
 </body>

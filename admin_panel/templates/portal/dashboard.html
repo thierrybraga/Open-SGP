@@ -26,7 +26,7 @@
             {{ profile.contracts_active }}
         </div>
         <p>Contratos Ativos</p>
-        <button class="btn btn-outline-secondary" style="width: 100%; margin-top: 1rem;" disabled>Gerenciar</button>
+        <a href="/portal/contracts" class="btn btn-outline-secondary" style="width: 100%; margin-top: 1rem;">Gerenciar</a>
     </div>
 </div>
 
@@ -35,7 +35,10 @@
     <div style="display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 1rem;">
         <a href="/portal/support" class="btn btn-secondary">📞 Abrir Chamado</a>
         <a href="/portal/invoices" class="btn btn-secondary">📄 2ª Via de Boleto</a>
-        <button class="btn btn-secondary" onclick="alert('Funcionalidade de desbloqueio em desenvolvimento')">🔓 Desbloqueio de Confiança</button>
+        <form action="/portal/trust-unlock" method="POST" style="display: inline;">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="btn btn-secondary">🔓 Solicitar Desbloqueio</button>
+        </form>
     </div>
 </div>
 {% endblock %}
