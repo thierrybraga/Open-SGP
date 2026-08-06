@@ -39,7 +39,7 @@ zeep==4.2.1
 
 # Correções Críticas - Network
 routeros-api==0.17.0
-paramiko==3.4.0
+paramiko==4.0.0
 
 # Novas dependências - GAPS Fixes
 psutil==5.9.8              # Health checks e monitoramento
